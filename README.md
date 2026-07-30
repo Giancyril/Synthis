@@ -41,11 +41,7 @@ Structured Output (.md / .json)
 
 ### 1. Prerequisites & Environment Setup
 
-Copy `.env.example` to `.env` and fill in your API keys:
-
-```bash
-cp .env.example .env
-```
+Create a `.env` file in the project root with your API keys:
 
 ```env
 TAVILY_API_KEY=tvly-your_key_here
