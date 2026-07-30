@@ -1,7 +1,11 @@
 import time
 import logging
 from typing import List, Dict, Any
-from tavily import TavilyClient
+
+try:
+    from tavily import TavilyClient
+except ImportError:
+    TavilyClient = None
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +13,10 @@ logger = logging.getLogger(__name__)
 class TavilyService:
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.client = TavilyClient(api_key=api_key) if api_key else None
+        if TavilyClient and api_key:
+            self.client = TavilyClient(api_key=api_key)
+        else:
+            self.client = None
 
     def search(
         self,
@@ -23,7 +30,7 @@ class TavilyService:
         Returns a list of dicts with keys: url, title, snippet, score, published_date.
         """
         if not self.client:
-            raise ValueError("Tavily API key is missing. Cannot perform search.")
+            raise ValueError("Tavily client is not initialized or API key is missing.")
 
         for attempt in range(1, max_retries + 1):
             try:
