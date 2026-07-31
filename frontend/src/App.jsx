@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import "./index.css";
-import { checkHealth, runResearch, fetchReports, fetchReportByFilename, executeFollowUpQuery } from "./api";
+import { checkHealth, runResearch, fetchReports, fetchReportByFilename, executeFollowUpQuery, runComparativeResearch } from "./api";
 import { CustomSelectDropdown, CustomDatePicker } from "./components";
 
 const STAGES = [
@@ -46,6 +46,9 @@ const SOURCE_CATEGORY_OPTIONS = [
 
 export default function App() {
   const [topic, setTopic] = useState("");
+  const [topicB, setTopicB] = useState("");
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareReport, setCompareReport] = useState(null);
   const [depth, setDepth] = useState("standard");
   const [loading, setLoading] = useState(false);
   const [stageIdx, setStageIdx] = useState(-1);
@@ -183,9 +186,18 @@ export default function App() {
     };
 
     try {
-      const data = await runResearch(topic.trim(), depth, filterSettings);
-      setReport(data.report);
-      setMarkdown(data.markdown || "");
+      if (compareMode) {
+        if (!topicB.trim()) { setError("Topic B cannot be empty."); setLoading(false); return; }
+        const data = await runComparativeResearch(topic.trim(), topicB.trim(), depth, filterSettings);
+        setCompareReport(data.report);
+        setReport(null);
+        setMarkdown("");
+      } else {
+        const data = await runResearch(topic.trim(), depth, filterSettings);
+        setReport(data.report);
+        setCompareReport(null);
+        setMarkdown(data.markdown || "");
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -401,6 +413,35 @@ export default function App() {
     }
   }
 
+  // Interactive inline citation renderer for comparative report
+  function renderCompareCitations(text, sources) {
+    if (!text) return null;
+    const parts = text.split(/(\[S\d+\])/g);
+    return parts.map((part, i) => {
+      if (/^\[S\d+\]$/.test(part)) {
+        const sourceId = part.slice(1, -1);
+        const sourceObj = sources?.find((s) => s.id === sourceId);
+        return (
+          <span key={i} className="inline-cite-container">
+            <span className="inline-cite-hover">{part}</span>
+            {sourceObj && (
+              <div className="cite-popover">
+                <div className="cite-popover-title">{sourceObj.title}</div>
+                <div className="cite-popover-meta">
+                  <span className="cite-popover-domain">{(() => { try { return new URL(sourceObj.url).hostname; } catch { return sourceObj.url; } })()}</span>
+                  <span className={`tier-badge ${sourceObj.credibility_tier || "unrated"}`}>{sourceObj.credibility_tier || "Unrated"}</span>
+                </div>
+                {sourceObj.snippet && <div className="cite-popover-snippet">{sourceObj.snippet.slice(0, 180)}…</div>}
+                <a href={sourceObj.url} target="_blank" rel="noopener noreferrer" className="cite-popover-link">Open source ↗</a>
+              </div>
+            )}
+          </span>
+        );
+      }
+      return part;
+    });
+  }
+
   // Interactive inline citation renderer with hover card popovers
   function renderInteractiveCitations(text) {
     const parts = text.split(/(\[S\d+\])/g);
@@ -514,17 +555,59 @@ export default function App() {
         )}
 
         <form className="search-box" onSubmit={handleSubmit}>
+          {/* Mode toggle */}
+          <div className="mode-toggle">
+            <button
+              type="button"
+              className={`mode-tab${!compareMode ? " active" : ""}`}
+              onClick={() => { setCompareMode(false); setCompareReport(null); }}
+            >
+              Single Topic
+            </button>
+            <button
+              type="button"
+              className={`mode-tab${compareMode ? " active" : ""}`}
+              onClick={() => { setCompareMode(true); setReport(null); setMarkdown(""); }}
+            >
+              Topic A vs B
+            </button>
+          </div>
+
           <div className="search-row">
-            <textarea
-              className="search-textarea"
-              placeholder="Enter a research topic… e.g. 'Solid state batteries 2026'"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={2}
-              maxLength={400}
-              disabled={loading}
-            />
+            {compareMode ? (
+              <>
+                <textarea
+                  className="search-textarea compare-half"
+                  placeholder="Topic A… e.g. 'React'"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  rows={2}
+                  maxLength={200}
+                  disabled={loading}
+                />
+                <div className="compare-vs-divider">vs</div>
+                <textarea
+                  className="search-textarea compare-half"
+                  placeholder="Topic B… e.g. 'Vue'"
+                  value={topicB}
+                  onChange={(e) => setTopicB(e.target.value)}
+                  rows={2}
+                  maxLength={200}
+                  disabled={loading}
+                />
+              </>
+            ) : (
+              <textarea
+                className="search-textarea"
+                placeholder="Enter a research topic… e.g. 'Solid state batteries 2026'"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                onKeyDown={handleKeyDown}
+                rows={2}
+                maxLength={400}
+                disabled={loading}
+              />
+            )}
             <button className="search-btn" type="submit" disabled={!topic.trim() || loading}>
               {loading ? (
                 <><div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Researching…</>
@@ -711,6 +794,83 @@ export default function App() {
           <div className="error-card">
             <div className="error-title">Research failed</div>
             <div className="error-msg">{error}</div>
+          </div>
+        )}
+
+        {/* Comparative Report */}
+        {compareReport && !loading && (
+          <div className="report-card">
+            <div className="cmp-report-header">
+              <div className="cmp-report-title">
+                <span className="cmp-topic-a">{compareReport.topic_a}</span>
+                <span className="cmp-vs-badge">vs</span>
+                <span className="cmp-topic-b">{compareReport.topic_b}</span>
+              </div>
+              <div className="report-meta">
+                {compareReport.sources?.length} sources · {compareReport.shared_dimensions?.length} dimensions · {compareReport.generated_at}
+              </div>
+            </div>
+
+            <div className="cmp-table-wrapper">
+              {/* Column headers */}
+              <div className="cmp-table-head">
+                <div className="cmp-col-dim">Dimension</div>
+                <div className="cmp-col-pos">{compareReport.topic_a}</div>
+                <div className="cmp-col-pos">{compareReport.topic_b}</div>
+              </div>
+
+              {compareReport.shared_dimensions?.map((dim, idx) => (
+                <div key={idx} className="cmp-table-row">
+                  <div className="cmp-col-dim">
+                    <span className="cmp-dim-name">{dim.dimension_name}</span>
+                    {dim.verdict_or_note && (
+                      <div className="cmp-verdict">{dim.verdict_or_note}</div>
+                    )}
+                  </div>
+                  <div className="cmp-col-pos cmp-pos-a">
+                    <div className="cmp-pos-text">
+                      {renderCompareCitations(dim.topic_a_position, compareReport.sources)}
+                    </div>
+                    <div className="cmp-source-badges">
+                      {dim.topic_a_source_ids?.map((sid) => (
+                        <span key={sid} className="source-badge">{sid}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="cmp-col-pos cmp-pos-b">
+                    <div className="cmp-pos-text">
+                      {renderCompareCitations(dim.topic_b_position, compareReport.sources)}
+                    </div>
+                    <div className="cmp-source-badges">
+                      {dim.topic_b_source_ids?.map((sid) => (
+                        <span key={sid} className="source-badge">{sid}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Sources list */}
+            {compareReport.sources?.length > 0 && (
+              <div style={{ padding: "16px 24px" }}>
+                <div className="label">Sources</div>
+                <div className="sources-list">
+                  {compareReport.sources.map((src) => (
+                    <div key={src.id} className="source-item">
+                      <span className="source-id">{src.id}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="source-title">{src.title}</div>
+                        <a className="source-url" href={src.url} target="_blank" rel="noopener noreferrer">{src.url}</a>
+                      </div>
+                      <span className={`tier-badge ${src.credibility_tier || "unrated"}`}>
+                        {src.credibility_tier || "Unrated"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
