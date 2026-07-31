@@ -95,6 +95,25 @@ class FollowUpResult(BaseModel):
     created_at: str
 
 
+class ComparisonDimension(BaseModel):
+    dimension_name: str
+    topic_a_position: str
+    topic_a_source_ids: List[str] = Field(default_factory=list)
+    topic_b_position: str
+    topic_b_source_ids: List[str] = Field(default_factory=list)
+    verdict_or_note: Optional[str] = None
+
+
+class ComparativeReport(BaseModel):
+    id: str
+    topic_a: str
+    topic_b: str
+    generated_at: str
+    shared_dimensions: List[ComparisonDimension] = Field(default_factory=list)
+    sources: List[Source] = Field(default_factory=list)
+    filter_settings: Optional[FilterSettings] = None
+
+
 class ResearchReport(BaseModel):
     id: Optional[str] = None
     topic: str
@@ -106,5 +125,7 @@ class ResearchReport(BaseModel):
     confidence_note: Optional[str] = None
     filter_settings: Optional[FilterSettings] = None
     follow_ups: List[FollowUpResult] = Field(default_factory=list)
+
+
 
 
