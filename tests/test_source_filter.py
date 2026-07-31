@@ -49,3 +49,15 @@ def test_source_filter_per_domain_limit():
     filtered = sf.filter_sources(sources)
 
     assert len(filtered) == 2
+
+
+def test_source_filter_credibility_tier():
+    sf = SourceFilter()
+    assert sf.classify_credibility("cdc.gov") == "primary"
+    assert sf.classify_credibility("stanford.edu") == "primary"
+    assert sf.classify_credibility("reuters.com") == "primary"
+    assert sf.classify_credibility("nytimes.com") == "secondary"
+    assert sf.classify_credibility("arxiv.org") == "secondary"
+    assert sf.classify_credibility("reddit.com") == "low-authority"
+    assert sf.classify_credibility("unknownblog123.org") == "unrated"
+

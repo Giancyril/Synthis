@@ -250,7 +250,18 @@ export default function App() {
             {sourceObj && (
               <div className="cite-popover">
                 <div className="cite-popover-title">{sourceObj.title}</div>
-                <div className="cite-popover-domain">{new URL(sourceObj.url).hostname}</div>
+                <div className="cite-popover-meta">
+                  <span className="cite-popover-domain">{new URL(sourceObj.url).hostname}</span>
+                  <span className={`tier-badge ${sourceObj.credibility_tier || "unrated"}`}>
+                    {sourceObj.credibility_tier === "primary"
+                      ? "Primary"
+                      : sourceObj.credibility_tier === "secondary"
+                      ? "Secondary"
+                      : sourceObj.credibility_tier === "low-authority"
+                      ? "Low Authority"
+                      : "Unrated"}
+                  </span>
+                </div>
                 <div className="cite-popover-snippet">{sourceObj.snippet || sourceObj.summary}</div>
               </div>
             )}
@@ -704,11 +715,22 @@ export default function App() {
                           {src.summary && (
                             <div className="source-summary">{src.summary}</div>
                           )}
-                          {src.relevance_score != null && (
-                            <div className="source-score">
-                              Relevance: {(src.relevance_score * 100).toFixed(0)}%
-                            </div>
-                          )}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                            {src.relevance_score != null && (
+                              <span className="source-score">
+                                Relevance: {(src.relevance_score * 100).toFixed(0)}%
+                              </span>
+                            )}
+                            <span className={`tier-badge ${src.credibility_tier || "unrated"}`}>
+                              {src.credibility_tier === "primary"
+                                ? "Primary"
+                                : src.credibility_tier === "secondary"
+                                ? "Secondary"
+                                : src.credibility_tier === "low-authority"
+                                ? "Low Authority"
+                                : "Unrated"}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     ))}

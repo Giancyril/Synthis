@@ -44,6 +44,7 @@ class Source(BaseModel):
     summary: Optional[str] = None  # Gemini's per-source summary
     published_date: Optional[str] = None
     relevance_score: Optional[float] = None
+    credibility_tier: str = "unrated"  # "primary" | "secondary" | "low-authority" | "unrated"
 
 
 class Citation(BaseModel):

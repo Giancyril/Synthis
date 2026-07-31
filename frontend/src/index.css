@@ -600,11 +600,50 @@ body {
   margin-bottom: 4px;
   line-height: 1.3;
 }
+.cite-popover-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
 .cite-popover-domain {
   font-size: 10px;
   color: var(--brand);
   font-family: 'JetBrains Mono', monospace;
-  margin-bottom: 6px;
+}
+
+/* ── Credibility Tier Badges ─────────────── */
+.tier-badge {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.tier-badge.primary {
+  color: var(--emerald);
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+.tier-badge.secondary {
+  color: var(--brand);
+  background: var(--brand-dim);
+  border: 1px solid rgba(129, 140, 248, 0.25);
+}
+.tier-badge.low-authority {
+  color: var(--amber);
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+.tier-badge.unrated {
+  color: var(--text-3);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
 }
 .cite-popover-snippet {
   font-size: 11px;

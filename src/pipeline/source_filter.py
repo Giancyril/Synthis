@@ -52,14 +52,60 @@ class SourceFilter:
             if len(retained) >= self.max_sources:
                 break
 
-        # Re-index IDs so downstream citations use clean S1, S2... references
+        # Re-index IDs and evaluate credibility tier for retained sources
         filtered_sources = []
         for idx, src in enumerate(retained, start=1):
-            updated = src.model_copy(update={"id": f"S{idx}"})
+            domain = self._extract_domain(src.url)
+            tier = self.classify_credibility(domain)
+            updated = src.model_copy(update={"id": f"S{idx}", "credibility_tier": tier})
             filtered_sources.append(updated)
 
         logger.info(f"Source filter: reduced {len(raw_sources)} raw sources to {len(filtered_sources)} clean sources.")
         return filtered_sources
+
+    @classmethod
+    def classify_credibility(cls, domain: str) -> str:
+        """
+        Classifies domain authority into 'primary', 'secondary', 'low-authority', or 'unrated'.
+        Does not fall back to 'low-authority' if unknown — returns 'unrated'.
+        """
+        if not domain:
+            return "unrated"
+
+        d = domain.lower()
+        if d.startswith("www."):
+            d = d[4:]
+
+        # Check primary TLDs (.gov, .edu, .mil, .int)
+        primary_tlds = (".gov", ".edu", ".mil", ".int")
+        if any(d.endswith(tld) or f"{tld}." in d for tld in primary_tlds):
+            return "primary"
+
+        primary_domains = {
+            "w3.org", "iso.org", "ietf.org", "ieee.org", "nist.gov", "who.int",
+            "reuters.com", "apnews.com", "bloomberg.com", "afp.com", "cdc.gov", "nasa.gov",
+        }
+        if d in primary_domains or any(d.endswith("." + pd) for pd in primary_domains):
+            return "primary"
+
+        secondary_domains = {
+            "nytimes.com", "bbc.com", "bbc.co.uk", "wsj.com", "theguardian.com",
+            "washingtonpost.com", "ft.com", "cnbc.com", "forbes.com", "wired.com",
+            "techcrunch.com", "arstechnica.com", "nature.com", "sciencedirect.com",
+            "arxiv.org", "biorxiv.org", "github.com", "microsoft.com",
+            "developer.mozilla.org", "sciencedaily.com", "ieee.org"
+        }
+        if d in secondary_domains or any(d.endswith("." + sd) for sd in secondary_domains):
+            return "secondary"
+
+        low_authority_domains = {
+            "reddit.com", "quora.com", "medium.com", "tumblr.com", "substack.com",
+            "dev.to", "pinterest.com", "answers.yahoo.com"
+        }
+        if d in low_authority_domains or any(d.endswith("." + ld) for ld in low_authority_domains):
+            return "low-authority"
+
+        return "unrated"
 
     @staticmethod
     def _normalize_url(url: str) -> str:
