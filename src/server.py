@@ -244,7 +244,63 @@ def execute_followup(req: FollowUpRequest):
         )
 
 
+class CompareRequest(BaseModel):
+    topic_a: str
+    topic_b: str
+    depth: str = "standard"
+    date_filter: str = "any"
+    custom_start_date: Optional[str] = None
+    custom_end_date: Optional[str] = None
+    domain_mode: str = "none"
+    domain_list: List[str] = Field(default_factory=list)
+    source_category: str = "general"
+
+    def get_filter_settings(self) -> FilterSettings:
+        return FilterSettings(
+            date_filter=self.date_filter,
+            custom_start_date=self.custom_start_date,
+            custom_end_date=self.custom_end_date,
+            domain_mode=self.domain_mode,
+            domain_list=self.domain_list,
+            source_category=self.source_category,
+        )
+
+
+@app.post("/api/research/compare", response_model=dict, tags=["Research"])
+def execute_comparative_research(req: CompareRequest):
+    if not req.topic_a or not req.topic_a.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Topic A cannot be empty.")
+    if not req.topic_b or not req.topic_b.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Topic B cannot be empty.")
+
+    try:
+        filter_settings = req.get_filter_settings()
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+    try:
+        cfg = Config(check_keys=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+
+    try:
+        from src.pipeline.comparative_pipeline import ComparativePipeline
+        pipeline = ComparativePipeline(config=cfg)
+        cmp_report = pipeline.execute(
+            topic_a=req.topic_a.strip(),
+            topic_b=req.topic_b.strip(),
+            depth=req.depth or "standard",
+            filter_settings=filter_settings,
+        )
+        return {"status": "success", "report": cmp_report.model_dump()}
+    except Exception as exc:
+        logger.error(f"Comparative pipeline failed: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Comparative research failed: {str(exc)}",
+        )
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("src.server:app", host="127.0.0.1", port=8000, reload=True)
-
