@@ -43,3 +43,23 @@ export async function fetchReportByFilename(filename) {
   if (!res.ok) throw new Error("Failed to fetch report detail");
   return res.json();
 }
+
+export async function executeFollowUpQuery(report, targetType, targetId, question) {
+  const res = await fetch("/api/research/follow-up", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      report,
+      target_type: targetType,
+      target_id: String(targetId),
+      question,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Follow-up query failed.");
+  }
+  return res.json();
+}
+

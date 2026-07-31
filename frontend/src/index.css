@@ -1270,3 +1270,162 @@ body {
   color: var(--amber);
   margin-bottom: 4px;
 }
+
+/* ── Follow-Up / Drill-Down Components ────── */
+.followup-trigger-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+.followup-trigger-btn:hover {
+  color: var(--brand);
+  background: var(--brand-dim);
+}
+
+.followup-form {
+  background: var(--surface-2);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-top: 8px;
+}
+.followup-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.followup-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 12px;
+}
+.followup-close-btn:hover { color: var(--text-1); }
+
+.followup-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.followup-chip {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.followup-chip:hover {
+  background: var(--brand-dim);
+  color: var(--brand-hi);
+  border-color: rgba(129, 140, 248, 0.3);
+}
+
+.followup-input-row {
+  display: flex;
+  gap: 6px;
+}
+.followup-input {
+  flex: 1;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-1);
+  outline: none;
+}
+.followup-input:focus { border-color: var(--brand); }
+.followup-submit-btn {
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.followup-submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.followup-result-card {
+  background: rgba(129, 140, 248, 0.05);
+  border: 1px solid rgba(129, 140, 248, 0.2);
+  border-left: 3px solid var(--brand);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-top: 10px;
+}
+.followup-result-card.merged {
+  border-color: rgba(52, 211, 153, 0.3);
+  border-left-color: var(--emerald);
+  background: rgba(52, 211, 153, 0.04);
+}
+.followup-result-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.followup-result-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+.followup-result-q {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+.followup-result-body {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.followup-result-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.followup-action-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: none;
+}
+.followup-action-btn.merge {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--emerald);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+.followup-action-btn.dismiss {
+  background: var(--surface-3);
+  color: var(--text-3);
+}
+.followup-merged-badge {
+  font-size: 11px;
+  color: var(--emerald);
+  font-weight: 500;
+}

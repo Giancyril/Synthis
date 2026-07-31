@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import "./index.css";
-import { checkHealth, runResearch, fetchReports, fetchReportByFilename } from "./api";
+import { checkHealth, runResearch, fetchReports, fetchReportByFilename, executeFollowUpQuery } from "./api";
 import { CustomSelectDropdown, CustomDatePicker } from "./components";
 
 const STAGES = [
@@ -76,6 +76,57 @@ export default function App() {
       .then(setHealth)
       .catch(() => setHealth({ status: "error" }));
   }, []);
+
+  const [activeFollowUpTarget, setActiveFollowUpTarget] = useState(null); // { type: "takeaway"|"section", id: string }
+  const [followUpQuestion, setFollowUpQuestion] = useState("");
+  const [followUpLoading, setFollowUpLoading] = useState(false);
+
+  async function handleExecuteFollowUp(type, id, questionOverride) {
+    const q = questionOverride || followUpQuestion;
+    if (!q || !q.trim() || followUpLoading || !report) return;
+
+    setFollowUpLoading(true);
+    try {
+      const res = await executeFollowUpQuery(report, type, String(id), q.trim());
+      if (res.result) {
+        setReport((prev) => ({
+          ...prev,
+          follow_ups: [...(prev.follow_ups || []), res.result],
+          sources: res.result.new_sources
+            ? [...(prev.sources || []), ...res.result.new_sources]
+            : prev.sources,
+        }));
+      }
+      setActiveFollowUpTarget(null);
+      setFollowUpQuestion("");
+    } catch (err) {
+      alert("Follow-up failed: " + err.message);
+    } finally {
+      setFollowUpLoading(false);
+    }
+  }
+
+  function handleMergeFollowUp(fu) {
+    if (!report) return;
+    const newSection = {
+      heading: `Follow-Up: ${fu.question}`,
+      content: fu.summary,
+    };
+    setReport((prev) => ({
+      ...prev,
+      sections: [...(prev.sections || []), newSection],
+      follow_ups: (prev.follow_ups || []).map((f) =>
+        f.follow_up_id === fu.follow_up_id ? { ...f, merged_into_parent: true } : f
+      ),
+    }));
+  }
+
+  function handleDismissFollowUp(fuId) {
+    setReport((prev) => ({
+      ...prev,
+      follow_ups: (prev.follow_ups || []).filter((f) => f.follow_up_id !== fuId),
+    }));
+  }
 
   // Stage animation timing adjusts based on depth
   useEffect(() => {
@@ -198,6 +249,120 @@ export default function App() {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
     }
+  }
+
+  function renderFollowUpUI(targetType, targetId) {
+    const isFormActive =
+      activeFollowUpTarget?.type === targetType &&
+      activeFollowUpTarget?.id === String(targetId);
+
+    const matchingResults = (report?.follow_ups || []).filter(
+      (fu) => fu.target_type === targetType && fu.target_id === String(targetId)
+    );
+
+    return (
+      <div className="followup-container" style={{ marginTop: 8 }}>
+        {!isFormActive ? (
+          <button
+            className="followup-trigger-btn"
+            onClick={() => {
+              setActiveFollowUpTarget({ type: targetType, id: String(targetId) });
+              setFollowUpQuestion("");
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ marginRight: 4 }}>
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              <line x1="11" y1="8" x2="11" y2="14" />
+              <line x1="8" y1="11" x2="14" y2="11" />
+            </svg>
+            Ask a follow-up
+          </button>
+        ) : (
+          <div className="followup-form">
+            <div className="followup-form-header">
+              <span>Drill-down on this {targetType}</span>
+              <button
+                className="followup-close-btn"
+                onClick={() => setActiveFollowUpTarget(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="followup-chips">
+              <button
+                className="followup-chip"
+                onClick={() => handleExecuteFollowUp(targetType, targetId, "Expand on this point with more details")}
+              >
+                Expand on this
+              </button>
+              <button
+                className="followup-chip"
+                onClick={() => handleExecuteFollowUp(targetType, targetId, "Find counter-arguments and opposing views")}
+              >
+                Find counter-arguments
+              </button>
+              <button
+                className="followup-chip"
+                onClick={() => handleExecuteFollowUp(targetType, targetId, "What is the source of disagreement here?")}
+              >
+                Source of disagreement?
+              </button>
+            </div>
+            <div className="followup-input-row">
+              <input
+                type="text"
+                className="followup-input"
+                placeholder="Or type a custom follow-up question..."
+                value={followUpQuestion}
+                onChange={(e) => setFollowUpQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleExecuteFollowUp(targetType, targetId);
+                }}
+              />
+              <button
+                className="followup-submit-btn"
+                disabled={followUpLoading || !followUpQuestion.trim()}
+                onClick={() => handleExecuteFollowUp(targetType, targetId)}
+              >
+                {followUpLoading ? "Searching..." : "Ask"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Render nested follow-up results */}
+        {matchingResults.map((fu) => (
+          <div key={fu.follow_up_id} className={`followup-result-card ${fu.merged_into_parent ? "merged" : ""}`}>
+            <div className="followup-result-header">
+              <span className="followup-result-tag">Follow-up Answer</span>
+              <span className="followup-result-q">"{fu.question}"</span>
+            </div>
+            <div className="followup-result-body">
+              {renderInteractiveCitations(fu.summary)}
+            </div>
+            <div className="followup-result-actions">
+              {!fu.merged_into_parent ? (
+                <button
+                  className="followup-action-btn merge"
+                  onClick={() => handleMergeFollowUp(fu)}
+                >
+                  + Merge into report
+                </button>
+              ) : (
+                <span className="followup-merged-badge">✓ Merged into report</span>
+              )}
+              <button
+                className="followup-action-btn dismiss"
+                onClick={() => handleDismissFollowUp(fu.follow_up_id)}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   // Open Past Reports Drawer
@@ -669,25 +834,25 @@ export default function App() {
                     <>
                       <div className="label">Key Takeaways</div>
                       <div className="takeaways">
-                        {report.key_takeaways.map((kt, i) => (
                           <div key={i} className="takeaway-item">
                             <div className="takeaway-bullet" />
-                            <div>
+                            <div style={{ flex: 1 }}>
                               <div className="takeaway-text">{kt.text}</div>
-                                <div className="takeaway-sources" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
-                                  {kt.corroboration_count >= 2 ? (
-                                    <span className="corrob-badge multi">
-                                      Corroborated by {kt.corroboration_count} sources
-                                    </span>
-                                  ) : (
-                                    <span className="corrob-badge single">
-                                      Single-sourced
-                                    </span>
-                                  )}
-                                  {kt.source_ids.map((sid) => (
-                                    <span key={sid} className="source-badge">{sid}</span>
-                                  ))}
-                                </div>
+                              <div className="takeaway-sources" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                                {kt.corroboration_count >= 2 ? (
+                                  <span className="corrob-badge multi">
+                                    Corroborated by {kt.corroboration_count} sources
+                                  </span>
+                                ) : (
+                                  <span className="corrob-badge single">
+                                    Single-sourced
+                                  </span>
+                                )}
+                                {kt.source_ids.map((sid) => (
+                                  <span key={sid} className="source-badge">{sid}</span>
+                                ))}
+                              </div>
+                              {renderFollowUpUI("takeaway", i)}
                             </div>
                           </div>
                         ))}
@@ -731,6 +896,7 @@ export default function App() {
                           <div className="section-content">
                             {renderInteractiveCitations(sec.content)}
                           </div>
+                          {renderFollowUpUI("section", sec.heading)}
                         </div>
                       ))}
                     </>
