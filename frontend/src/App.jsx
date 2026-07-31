@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./index.css";
-import { checkHealth, runResearch } from "./api";
+import { checkHealth, runResearch, fetchReports, fetchReportByFilename } from "./api";
 
 const STAGES = [
   { id: 1, label: "Planning search queries with Gemini" },
@@ -14,24 +14,19 @@ const STAGES = [
 const EXAMPLE_TOPICS = [
   "Solid state battery technology 2026",
   "AI agents in software engineering",
-  "Quantum computing commercial applications",
   "mRNA vaccine technology advances",
   "Fusion energy latest breakthroughs",
 ];
 
-function renderInlineCitations(text) {
-  const parts = text.split(/(\[S\d+\])/g);
-  return parts.map((part, i) =>
-    /^\[S\d+\]$/.test(part) ? (
-      <span key={i} className="inline-cite">{part}</span>
-    ) : (
-      part
-    )
-  );
-}
+const DEPTH_OPTIONS = [
+  { id: "quick", label: "Quick Scan", desc: "2 queries · 6 sources" },
+  { id: "standard", label: "Standard", desc: "4 queries · 12 sources" },
+  { id: "deep", label: "Deep Research", desc: "6 queries · 20 sources" },
+];
 
 export default function App() {
   const [topic, setTopic] = useState("");
+  const [depth, setDepth] = useState("standard");
   const [loading, setLoading] = useState(false);
   const [stageIdx, setStageIdx] = useState(-1);
   const [report, setReport] = useState(null);
@@ -41,21 +36,37 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [health, setHealth] = useState(null);
 
+  // Advanced feature states
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showDrawer, setShowDrawer] = useState(false);
+  const [historyReports, setHistoryReports] = useState([]);
+  const synthRef = useRef(null);
+
   useEffect(() => {
     checkHealth()
       .then(setHealth)
       .catch(() => setHealth({ status: "error" }));
   }, []);
 
-  // Simulate progressive stage reveal during loading
+  // Stage animation timing adjusts based on depth
   useEffect(() => {
     if (!loading) { setStageIdx(-1); return; }
     setStageIdx(0);
+    const delay = depth === "quick" ? 3000 : depth === "deep" ? 7000 : 5000;
     const timers = STAGES.map((_, i) =>
-      setTimeout(() => setStageIdx(i), i * 5200)
+      setTimeout(() => setStageIdx(i), i * delay)
     );
     return () => timers.forEach(clearTimeout);
-  }, [loading]);
+  }, [loading, depth]);
+
+  // Clean up speech synthesis on unmount
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   async function handleSubmit(e) {
     e?.preventDefault();
@@ -65,8 +76,9 @@ export default function App() {
     setMarkdown("");
     setLoading(true);
     setActiveTab("overview");
+    stopAudio();
     try {
-      const data = await runResearch(topic.trim());
+      const data = await runResearch(topic.trim(), depth);
       setReport(data.report);
       setMarkdown(data.markdown || "");
     } catch (err) {
@@ -99,6 +111,102 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  function handlePrint() {
+    window.print();
+  }
+
+  // Speech Audio Narration for Takeaways
+  function toggleAudioSummary() {
+    if (!window.speechSynthesis) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    if (!report?.key_takeaways?.length) return;
+
+    const textToRead = report.key_takeaways.map((t) => t.text).join(". ");
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    setIsSpeaking(true);
+  }
+
+  function stopAudio() {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  }
+
+  // Open Past Reports Drawer
+  async function handleOpenHistory() {
+    setShowDrawer(true);
+    try {
+      const list = await fetchReports();
+      setHistoryReports(list);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // Load a past report from history
+  async function handleSelectHistoryReport(filename) {
+    setShowDrawer(false);
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetchReportByFilename(filename);
+      setMarkdown(res.markdown);
+
+      // Parse markdown basic metadata to populate UI
+      setReport({
+        topic: filename.replace(/^report_/, "").replace(/\.md$/, "").replace(/_/g, " "),
+        generated_at: "Saved Report",
+        key_takeaways: [],
+        sections: [{ heading: "Full Research Report", content: res.markdown }],
+        sources: [],
+      });
+      setActiveTab("markdown");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Interactive inline citation renderer with hover card popovers
+  function renderInteractiveCitations(text) {
+    const parts = text.split(/(\[S\d+\])/g);
+    return parts.map((part, i) => {
+      if (/^\[S\d+\]$/.test(part)) {
+        const sourceId = part.slice(1, -1);
+        const sourceObj = report?.sources?.find((s) => s.id === sourceId);
+
+        return (
+          <span key={i} className="inline-cite-container">
+            <span className="inline-cite-hover">{part}</span>
+            {sourceObj && (
+              <div className="cite-popover">
+                <div className="cite-popover-title">{sourceObj.title}</div>
+                <div className="cite-popover-domain">{new URL(sourceObj.url).hostname}</div>
+                <div className="cite-popover-snippet">{sourceObj.snippet || sourceObj.summary}</div>
+              </div>
+            )}
+          </span>
+        );
+      }
+      return part;
+    });
+  }
+
   const sourceCount = report?.sources?.length ?? 0;
   const takeawayCount = report?.key_takeaways?.length ?? 0;
   const sectionCount = report?.sections?.length ?? 0;
@@ -108,13 +216,25 @@ export default function App() {
       {/* ── Header ── */}
       <header className="header">
         <div className="header-logo">
-          <div className="dot" />
           Synthis
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button className="action-btn" onClick={handleOpenHistory}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            Past Reports
+          </button>
           {health && (
-            <span className="status-dot" style={{ marginRight: 4 }}
-              data-status={health.status === "healthy" && health.tavily_configured && health.gemini_configured ? "ok" : "warn"}
+            <span
+              className={`status-dot ${
+                health.status === "healthy" &&
+                health.tavily_configured &&
+                health.gemini_configured
+                  ? "ok"
+                  : "warn"
+              }`}
             />
           )}
           <span className="header-badge">Research AI</span>
@@ -134,7 +254,7 @@ export default function App() {
           <span>cited from the web</span>
         </h1>
         <p>
-          Enter a topic and get a structured research report — every claim traced
+          Enter a topic and get a structured research report every claim traced
           back to a live Tavily-retrieved source. Zero hallucinations.
         </p>
       </section>
@@ -179,12 +299,31 @@ export default function App() {
               {loading ? (
                 <><div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Researching…</>
               ) : (
-                <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg> Research</>
+                <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg> Research</>
               )}
             </button>
           </div>
+
           <div className="search-footer">
-            <span className="search-hint">Enter to submit · Shift+Enter for new line</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <span className="search-hint">Enter to submit · Shift+Enter for new line</span>
+              
+              {/* Depth selector */}
+              <div className="depth-selector">
+                {DEPTH_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`depth-btn${depth === opt.id ? " active" : ""}`}
+                    onClick={() => setDepth(opt.id)}
+                    disabled={loading}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <span className={`char-counter${topic.length > 340 ? " warn" : ""}`}>
               {topic.length}/400
             </span>
@@ -196,7 +335,7 @@ export default function App() {
           <div className="chips" style={{ marginTop: 14 }}>
             {EXAMPLE_TOPICS.map((t) => (
               <button key={t} className="chip" onClick={() => setTopic(t)}>
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="9 18 15 12 9 6"/></svg>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="9 18 15 12 9 6" /></svg>
                 {t}
               </button>
             ))}
@@ -212,7 +351,7 @@ export default function App() {
             <div className="progress-header">
               <div className="spinner" />
               <div>
-                <div className="progress-title">Generating research report…</div>
+                <div className="progress-title">Generating research report ({depth} mode)…</div>
                 <div className="progress-topic">{topic}</div>
               </div>
             </div>
@@ -252,19 +391,41 @@ export default function App() {
               <div>
                 <div className="report-title">{report.topic}</div>
                 <div className="report-meta">
-                  {sourceCount} sources · {takeawayCount} takeaways · {sectionCount} sections · {report.generated_at}
+                  {sourceCount > 0 && <>{sourceCount} sources · </>}
+                  {takeawayCount > 0 && <>{takeawayCount} takeaways · </>}
+                  {sectionCount} sections · {report.generated_at}
                 </div>
               </div>
               <div className="report-actions">
+                {/* Audio speech button */}
+                {report.key_takeaways?.length > 0 && (
+                  <button className="action-btn" onClick={toggleAudioSummary}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                    </svg>
+                    {isSpeaking ? "Stop Audio" : "Listen Summary"}
+                  </button>
+                )}
+                
+                <button className="action-btn" onClick={handlePrint}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <polyline points="6 9 6 2 18 2 18 9" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <rect x="6" y="14" width="12" height="8" />
+                  </svg>
+                  Print
+                </button>
+
                 <button className={`action-btn${copied ? " success" : ""}`} onClick={handleCopy}>
                   {copied ? (
-                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> Copied</>
+                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg> Copied</>
                   ) : (
-                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy MD</>
+                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg> Copy MD</>
                   )}
                 </button>
                 <button className="action-btn" onClick={handleDownload}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                   Download
                 </button>
               </div>
@@ -279,7 +440,7 @@ export default function App() {
                   onClick={() => setActiveTab(tab)}
                 >
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  {tab === "sources" && <> ({sourceCount})</>}
+                  {tab === "sources" && sourceCount > 0 && <> ({sourceCount})</>}
                 </button>
               ))}
             </div>
@@ -290,7 +451,7 @@ export default function App() {
                 <>
                   {report.confidence_note && (
                     <div className="confidence-note">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
                       {report.confidence_note}
                     </div>
                   )}
@@ -319,7 +480,7 @@ export default function App() {
                     </>
                   )}
 
-                  {/* Report sections */}
+                  {/* Report sections with interactive citation hover popovers */}
                   {report.sections?.length > 0 && (
                     <>
                       <div className="label" style={{ marginTop: 24 }}>Report Sections</div>
@@ -327,7 +488,7 @@ export default function App() {
                         <div key={i} className="section-block">
                           <div className="section-heading">{sec.heading}</div>
                           <div className="section-content">
-                            {renderInlineCitations(sec.content)}
+                            {renderInteractiveCitations(sec.content)}
                           </div>
                         </div>
                       ))}
@@ -385,7 +546,7 @@ export default function App() {
           <div className="empty-state">
             <div className="empty-icon">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}>
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
             </div>
             <h3>Enter a topic to begin</h3>
@@ -393,6 +554,38 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* ── Slide-out History Drawer ── */}
+      {showDrawer && (
+        <div className="drawer-overlay" onClick={() => setShowDrawer(false)}>
+          <div className="drawer-content" onClick={(e) => e.stopPropagation()}>
+            <div className="drawer-header">
+              <div className="drawer-title">Past Research Reports</div>
+              <button className="close-btn" onClick={() => setShowDrawer(false)}>✕</button>
+            </div>
+            <div className="history-list">
+              {historyReports.length === 0 ? (
+                <div style={{ fontSize: 13, color: "var(--text-3)", textAlign: "center", paddingTop: 40 }}>
+                  No saved reports found on server.
+                </div>
+              ) : (
+                historyReports.map((item) => (
+                  <div
+                    key={item.filename}
+                    className="history-item"
+                    onClick={() => handleSelectHistoryReport(item.filename)}
+                  >
+                    <div className="history-name">{item.filename}</div>
+                    <div className="history-meta">
+                      {(item.size_bytes / 1024).toFixed(1)} KB
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

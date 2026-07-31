@@ -31,6 +31,7 @@ def run_research_pipeline(
     topic: str,
     output_path: str = "output/report.md",
     format_type: str = "markdown",
+    depth: str = "standard",
     config: Config = None,
 ) -> ResearchReport:
     """
@@ -40,9 +41,17 @@ def run_research_pipeline(
     if config is None:
         config = Config(check_keys=True)
 
+    # Configure depth parameters
+    depth_settings = {
+        "quick": {"max_queries": 2, "max_sources": 6},
+        "standard": {"max_queries": 4, "max_sources": 12},
+        "deep": {"max_queries": 6, "max_sources": 20},
+    }
+    settings = depth_settings.get(depth.lower(), depth_settings["standard"])
+
     print(f"\n=======================================================")
     print(f"🚀 AI Research Assistant — Grounded Pipeline")
-    print(f"Topic: '{topic}'")
+    print(f"Topic: '{topic}' | Depth: {depth.upper()} ({settings['max_queries']} queries, max {settings['max_sources']} sources)")
     print(f"=======================================================\n")
 
     # Initialize services
@@ -52,7 +61,7 @@ def run_research_pipeline(
     # Step 1: Query Planning
     print(" [1/6] Planning search queries with Gemini...")
     planner = QueryPlanner(gemini_svc)
-    queries = planner.plan_queries(topic)
+    queries = planner.plan_queries(topic, max_queries=settings["max_queries"])
     print(f"   └─ Planned {len(queries)} search queries:")
     for q in queries:
         print(f"      • {q}")
@@ -65,7 +74,7 @@ def run_research_pipeline(
 
     # Step 3: Filtering & Deduplication
     print("\n [3/6] Deduplicating and filtering high-relevance sources...")
-    source_filter = SourceFilter(min_score=0.2, max_sources=15)
+    source_filter = SourceFilter(min_score=0.2, max_sources=settings["max_sources"])
     clean_sources = source_filter.filter_sources(raw_sources)
     print(f"   └─ Retained {len(clean_sources)} clean sources.")
 

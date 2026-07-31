@@ -33,6 +33,7 @@ app.add_middleware(
 class ResearchRequest(BaseModel):
     topic: str
     output_filename: Optional[str] = None
+    depth: Optional[str] = "standard"
 
 
 class HealthResponse(BaseModel):
@@ -94,6 +95,7 @@ def execute_research(req: ResearchRequest):
             topic=cleaned_topic,
             output_path=str(out_path),
             format_type="markdown",
+            depth=req.depth or "standard",
             config=cfg,
         )
 
@@ -131,7 +133,31 @@ def list_reports():
                 modified_at=str(stat.st_mtime),
             )
         )
-    return reports
+    return sorted(reports, key=lambda r: r.modified_at, reverse=True)
+
+
+@app.get("/api/reports/{filename}", response_model=dict, tags=["Reports"])
+def get_report_by_filename(filename: str):
+    # Sanitize filename
+    safe_name = Path(filename).name
+    p = Path("output") / safe_name
+    if not p.exists() or not p.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report file '{safe_name}' not found.",
+        )
+
+    try:
+        md_content = p.read_text(encoding="utf-8")
+        return {
+            "filename": safe_name,
+            "markdown": md_content,
+        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read report: {str(exc)}",
+        )
 
 
 if __name__ == "__main__":
