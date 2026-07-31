@@ -722,12 +722,139 @@ body {
   font-family: 'JetBrains Mono', monospace;
 }
 
+/* ── Filter Panel & Scope Controls ─────────── */
+.filter-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 5px 12px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s;
+}
+.filter-toggle-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+.filter-toggle-btn.active {
+  color: var(--brand);
+  border-color: rgba(129,140,248,.35);
+  background: var(--brand-dim);
+}
+
+.filter-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fadeIn 0.18s ease;
+}
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.filter-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.filter-select, .filter-input {
+  background: var(--surface-1);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-sm);
+  color: var(--text-1);
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  transition: border-color 0.15s;
+}
+.filter-select:focus, .filter-input:focus {
+  border-color: var(--brand);
+}
+.date-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.domain-input-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.domain-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.domain-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--brand);
+  background: var(--brand-dim);
+  border: 1px solid rgba(129,140,248,.25);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+.domain-tag-remove {
+  background: none;
+  border: none;
+  color: var(--brand);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+}
+.domain-tag-remove:hover { color: var(--rose); }
+
+/* ── Filter Summary Chips above report ─────── */
+.filter-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.filter-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border-hi);
+  border-radius: 99px;
+  padding: 3px 10px;
+}
+.filter-summary-chip .icon {
+  color: var(--brand);
+}
+
 /* ── Print Stylesheet ──────────────────────── */
 @media print {
   body { background: #fff !important; color: #000 !important; }
-  .header, .hero, .search-card, .status-bar, .report-actions, .tabs, .depth-selector, .audio-bar { display: none !important; }
+  .header, .hero, .search-card, .status-bar, .report-actions, .tabs, .depth-selector, .audio-bar, .filter-toggle-btn, .filter-panel { display: none !important; }
   .main, .report-card { width: 100% !important; max-width: none !important; border: none !important; background: transparent !important; }
   .report-body { padding: 0 !important; }
   .takeaway-item { background: #f4f4f5 !important; border: 1px solid #e4e4e7 !important; color: #000 !important; }
   .section-content { color: #18181b !important; }
 }
+

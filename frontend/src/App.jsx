@@ -36,11 +36,20 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [health, setHealth] = useState(null);
 
+  // Advanced filter states
+  const [dateFilter, setDateFilter] = useState("any");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [domainMode, setDomainMode] = useState("none");
+  const [domainList, setDomainList] = useState([]);
+  const [domainInput, setDomainInput] = useState("");
+  const [sourceCategory, setSourceCategory] = useState("general");
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+
   // Advanced feature states
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showDrawer, setShowDrawer] = useState(false);
   const [historyReports, setHistoryReports] = useState([]);
-  const synthRef = useRef(null);
 
   useEffect(() => {
     checkHealth()
@@ -68,6 +77,21 @@ export default function App() {
     };
   }, []);
 
+  function handleAddDomain(e) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const val = domainInput.trim().toLowerCase();
+      if (val && !domainList.includes(val)) {
+        setDomainList([...domainList, val]);
+        setDomainInput("");
+      }
+    }
+  }
+
+  function handleRemoveDomain(d) {
+    setDomainList(domainList.filter((item) => item !== d));
+  }
+
   async function handleSubmit(e) {
     e?.preventDefault();
     if (!topic.trim() || loading) return;
@@ -77,8 +101,18 @@ export default function App() {
     setLoading(true);
     setActiveTab("overview");
     stopAudio();
+
+    const filterSettings = {
+      date_filter: dateFilter,
+      custom_start_date: dateFilter === "custom" ? customStartDate : null,
+      custom_end_date: dateFilter === "custom" ? customEndDate : null,
+      domain_mode: domainMode,
+      domain_list: domainList,
+      source_category: sourceCategory,
+    };
+
     try {
-      const data = await runResearch(topic.trim(), depth);
+      const data = await runResearch(topic.trim(), depth, filterSettings);
       setReport(data.report);
       setMarkdown(data.markdown || "");
     } catch (err) {
@@ -305,7 +339,7 @@ export default function App() {
           </div>
 
           <div className="search-footer">
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span className="search-hint">Enter to submit · Shift+Enter for new line</span>
               
               {/* Depth selector */}
@@ -322,12 +356,129 @@ export default function App() {
                   </button>
                 ))}
               </div>
+
+              {/* Filter Panel Toggle */}
+              <button
+                type="button"
+                className={`filter-toggle-btn${showFilterPanel || dateFilter !== "any" || domainMode !== "none" || sourceCategory !== "general" ? " active" : ""}`}
+                onClick={() => setShowFilterPanel(!showFilterPanel)}
+                disabled={loading}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+                Filters {dateFilter !== "any" || domainMode !== "none" || sourceCategory !== "general" ? "• Active" : ""}
+              </button>
             </div>
 
             <span className={`char-counter${topic.length > 340 ? " warn" : ""}`}>
               {topic.length}/400
             </span>
           </div>
+
+          {/* Expandable Filter Panel */}
+          {showFilterPanel && (
+            <div className="filter-panel">
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                {/* Date range filter */}
+                <div className="filter-group" style={{ flex: 1, minWidth: 200 }}>
+                  <label className="filter-label">📅 Date Range</label>
+                  <select
+                    className="filter-select"
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    disabled={loading}
+                  >
+                    <option value="any">Any time</option>
+                    <option value="past_year">Past year</option>
+                    <option value="past_5_years">Past 5 years</option>
+                    <option value="custom">Custom range...</option>
+                  </select>
+                  {dateFilter === "custom" && (
+                    <div className="date-custom-row">
+                      <input
+                        type="date"
+                        className="filter-input"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        placeholder="Start Date"
+                        disabled={loading}
+                      />
+                      <span style={{ fontSize: 11, color: "var(--text-3)" }}>to</span>
+                      <input
+                        type="date"
+                        className="filter-input"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        placeholder="End Date"
+                        disabled={loading}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Domain filter mode */}
+                <div className="filter-group" style={{ flex: 1, minWidth: 220 }}>
+                  <label className="filter-label">🌐 Domain Filter</label>
+                  <div className="domain-input-row">
+                    <select
+                      className="filter-select"
+                      value={domainMode}
+                      onChange={(e) => setDomainMode(e.target.value)}
+                      disabled={loading}
+                    >
+                      <option value="none">Off (All domains)</option>
+                      <option value="include">Include only</option>
+                      <option value="exclude">Exclude</option>
+                    </select>
+                    {domainMode !== "none" && (
+                      <input
+                        type="text"
+                        className="filter-input"
+                        style={{ flex: 1 }}
+                        placeholder="e.g. arxiv.org, *.edu (Enter)"
+                        value={domainInput}
+                        onChange={(e) => setDomainInput(e.target.value)}
+                        onKeyDown={handleAddDomain}
+                        disabled={loading}
+                      />
+                    )}
+                  </div>
+                  {domainMode !== "none" && domainList.length > 0 && (
+                    <div className="domain-tags">
+                      {domainList.map((d) => (
+                        <span key={d} className="domain-tag">
+                          {d}
+                          <button
+                            type="button"
+                            className="domain-tag-remove"
+                            onClick={() => handleRemoveDomain(d)}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Source Category */}
+                <div className="filter-group" style={{ width: 140 }}>
+                  <label className="filter-label">📰 Topic Scope</label>
+                  <select
+                    className="filter-select"
+                    value={sourceCategory}
+                    onChange={(e) => setSourceCategory(e.target.value)}
+                    disabled={loading}
+                  >
+                    <option value="general">General</option>
+                    <option value="news">News</option>
+                    <option value="finance">Finance</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
         </form>
 
         {/* Example chips */}
@@ -386,6 +537,37 @@ export default function App() {
         {/* Report */}
         {report && !loading && (
           <div className="report-card">
+            {/* Filter Summary Chips */}
+            {report.filter_settings && (
+              <div className="filter-summary-row" style={{ padding: "14px 24px 0" }}>
+                <span className="filter-summary-chip">
+                  <span className="icon">📅</span>
+                  {report.filter_settings.date_filter === "past_year"
+                    ? "Past year"
+                    : report.filter_settings.date_filter === "past_5_years"
+                    ? "Past 5 years"
+                    : report.filter_settings.date_filter === "custom"
+                    ? `Custom: ${report.filter_settings.custom_start_date || "?"} to ${report.filter_settings.custom_end_date || "?"}`
+                    : "Any time"}
+                </span>
+
+                {report.filter_settings.domain_mode !== "none" && report.filter_settings.domain_list?.length > 0 && (
+                  <span className="filter-summary-chip">
+                    <span className="icon">🌐</span>
+                    {report.filter_settings.domain_mode === "include" ? "Only: " : "Exclude: "}
+                    {report.filter_settings.domain_list.join(", ")}
+                  </span>
+                )}
+
+                {report.filter_settings.source_category && report.filter_settings.source_category !== "general" && (
+                  <span className="filter-summary-chip">
+                    <span className="icon">📰</span>
+                    {report.filter_settings.source_category.toUpperCase()} scope
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Report header */}
             <div className="report-header">
               <div>

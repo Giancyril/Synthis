@@ -4,15 +4,30 @@ export async function checkHealth() {
   return res.json();
 }
 
-export async function runResearch(topic, depth = "standard") {
+export async function runResearch(topic, depth = "standard", filterSettings = {}) {
+  const payload = {
+    topic,
+    depth,
+    date_filter: filterSettings.date_filter || "any",
+    custom_start_date: filterSettings.custom_start_date || null,
+    custom_end_date: filterSettings.custom_end_date || null,
+    domain_mode: filterSettings.domain_mode || "none",
+    domain_list: filterSettings.domain_list || [],
+    source_category: filterSettings.source_category || "general",
+  };
+
   const res = await fetch("/api/research", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic, depth }),
+    body: JSON.stringify(payload),
   });
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Research request failed");
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map((d) => d.msg || JSON.stringify(d)).join("; ")
+      : err.detail || "Research request failed";
+    throw new Error(detail);
   }
   return res.json();
 }
