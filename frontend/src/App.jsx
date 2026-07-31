@@ -492,10 +492,10 @@ export default function App() {
                     {sourceObj.credibility_tier === "primary"
                       ? "Primary"
                       : sourceObj.credibility_tier === "secondary"
-                      ? "Secondary"
-                      : sourceObj.credibility_tier === "low-authority"
-                      ? "Low Authority"
-                      : "Unrated"}
+                        ? "Secondary"
+                        : sourceObj.credibility_tier === "low-authority"
+                          ? "Low Authority"
+                          : "Unrated"}
                   </span>
                 </div>
                 <div className="cite-popover-snippet">{sourceObj.snippet || sourceObj.summary}</div>
@@ -518,7 +518,8 @@ export default function App() {
     <div className="app">
       {/* ── Header ── */}
       <header className="header">
-        <div className="header-logo">
+        <div className="header-logo" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <img src="/favicon.svg" alt="Synthis Logo" style={{ width: 26, height: 26, borderRadius: 6 }} />
           Synthis
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -532,10 +533,10 @@ export default function App() {
           {health && (
             <span
               className={`status-dot ${health.status === "healthy" &&
-                  health.tavily_configured &&
-                  health.gemini_configured
-                  ? "ok"
-                  : "warn"
+                health.tavily_configured &&
+                health.gemini_configured
+                ? "ok"
+                : "warn"
                 }`}
             />
           )}
@@ -568,10 +569,10 @@ export default function App() {
           <div className="status-bar" style={{ paddingLeft: 0, marginBottom: 12 }}>
             <span
               className={`status-dot ${health.status === "healthy" &&
-                  health.tavily_configured &&
-                  health.gemini_configured
-                  ? "ok"
-                  : "warn"
+                health.tavily_configured &&
+                health.gemini_configured
+                ? "ok"
+                : "warn"
                 }`}
             />
             <span>
@@ -608,7 +609,7 @@ export default function App() {
               <>
                 <textarea
                   className="search-textarea compare-half"
-                  placeholder="Topic A… e.g. 'React'"
+                  placeholder="Enter the first topic..."
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   rows={2}
@@ -618,7 +619,7 @@ export default function App() {
                 <div className="compare-vs-divider">vs</div>
                 <textarea
                   className="search-textarea compare-half"
-                  placeholder="Topic B… e.g. 'Vue'"
+                  placeholder="Enter the topic to compare..."
                   value={topicB}
                   onChange={(e) => setTopicB(e.target.value)}
                   rows={2}
@@ -1144,10 +1145,10 @@ export default function App() {
                               {src.credibility_tier === "primary"
                                 ? "Primary"
                                 : src.credibility_tier === "secondary"
-                                ? "Secondary"
-                                : src.credibility_tier === "low-authority"
-                                ? "Low Authority"
-                                : "Unrated"}
+                                  ? "Secondary"
+                                  : src.credibility_tier === "low-authority"
+                                    ? "Low Authority"
+                                    : "Unrated"}
                             </span>
                           </div>
                         </div>
