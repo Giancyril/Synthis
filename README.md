@@ -38,6 +38,11 @@ All active filters are echoed back in the UI as summary chips above the generate
 - **Structured Contradiction Detection**: Extracts genuine conflicting facts, dates, timelines, or conclusions between sources into structured `conflicting_information` data. Rendered in a dedicated side-by-side **Conflicting Information** UI card displaying disputed topics with competing claims and supporting source citations.
 - **Source Recency & Staleness Warnings**: Audits source publication dates during citation validation. If the median age of cited sources exceeds 12 months, or if publication dates are unavailable for most sources, a prominent **Source Recency Warning** banner (`.confidence-banner`) is surfaced at the top of the report.
 
+### Research Depth & Iteration Engine
+- **Follow-Up Questions & Drill-Downs**: Allows users to click on any key takeaway or report section and run a targeted mini-pipeline pass. Uses 1 scoped query, re-indexes new sources with non-overlapping ID offsets (`S6`, `S7`...), synthesizes a grounded answer, and offers 1-click **"+ Merge into report"** or **"Dismiss"** actions.
+- **Comparative Research Mode**: A dedicated comparative pipeline for "Topic A vs Topic B" inquiries. Automatically infers 3–6 domain-relevant comparison dimensions, executes dual retrieval passes per topic, synthesizes side-by-side positions with inline `[S#]` citations, and renders a side-by-side comparative table layout.
+- **Save & Merge Sessions**: Multi-pass research sessions for ongoing investigation over time. Automatically deduplicates newly retrieved web sources against prior passes by normalized URL, generates a **"What's New / Changed"** delta summary, and appends new cited takeaways to a unified session timeline.
+
 ### Advanced Features
 - **Research Depth Selector**: User-controlled execution modes tailored for different research needs:
   - **Quick Scan**: 2 queries, max 6 sources — ultra-fast initial overview
@@ -185,29 +190,35 @@ AI Research Assistant/
 │   ├── models/                 # Pydantic schemas
 │   │   ├── __init__.py
 │   │   └── schemas.py          # FilterSettings, Source, KeyTakeaway, ReportSection, ResearchReport
-│   ├── services/               # Third-party service wrappers
-│   │   ├── __init__.py
-│   │   ├── gemini_client.py    # Gemini API wrapper with backoff retry
-│   │   └── tavily_client.py    # Tavily API wrapper with native filter passthrough
-│   ├── pipeline/               # 6-stage research pipeline modules
-│   │   ├── __init__.py
-│   │   ├── query_planner.py    # Stage 1: Topic -> Search Queries (depth-aware)
-│   │   ├── retriever.py        # Stage 2: Queries -> Web Sources (+ FilterSettings)
-│   │   ├── source_filter.py    # Stage 3: Deduplication & Filtering
-│   │   ├── summarizer.py       # Stage 4: Grounded Source Summarization
-│   │   ├── synthesizer.py      # Stage 5: Executive Synthesis
-│   │   └── citation_mapper.py  # Stage 6: Grounding & Citation Audit
-│   └── output/                 # Exporters
-│       ├── __init__.py
-│       ├── markdown_export.py  # Markdown generator
-│       └── json_export.py      # JSON exporter
-├── tests/                      # Automated test suite (23 tests)
+│   │   ├── services/               # Service wrappers & session manager
+│   │   │   ├── __init__.py
+│   │   │   ├── gemini_client.py    # Gemini API wrapper with backoff retry
+│   │   │   ├── tavily_client.py    # Tavily API wrapper with native filter passthrough
+│   │   │   └── session_manager.py  # Multi-pass research session orchestrator & delta synthesis
+│   │   ├── pipeline/               # Research pipeline modules
+│   │   │   ├── __init__.py
+│   │   │   ├── query_planner.py    # Stage 1: Topic -> Search Queries (depth-aware)
+│   │   │   ├── retriever.py        # Stage 2: Queries -> Web Sources (+ FilterSettings)
+│   │   │   ├── source_filter.py    # Stage 3: Deduplication & Filtering
+│   │   │   ├── summarizer.py       # Stage 4: Grounded Source Summarization
+│   │   │   ├── synthesizer.py      # Stage 5: Executive Synthesis
+│   │   │   ├── citation_mapper.py  # Stage 6: Grounding & Citation Audit
+│   │   │   ├── followup_pipeline.py# Scoped mini-pipeline for drill-downs
+│   │   │   └── comparative_pipeline.py # 5-stage dimensional comparative pipeline
+│   │   └── output/                 # Exporters
+│   │       ├── __init__.py
+│   │       ├── markdown_export.py  # Markdown generator
+│   │       └── json_export.py      # JSON exporter
+├── tests/                      # Automated test suite (29 tests)
 │   ├── __init__.py
 │   ├── test_citation_mapper.py
+│   ├── test_comparative.py     # Comparative pipeline & citation verification tests
 │   ├── test_exports.py
+│   ├── test_followup.py        # Mini-pipeline & source ID offset tests
 │   ├── test_integration.py     # Live API integration tests (skipped by default)
 │   ├── test_query_planner.py
 │   ├── test_retriever.py
+│   ├── test_sessions.py        # Multi-pass session deduplication & delta synthesis tests
 │   ├── test_source_filter.py
 │   ├── test_summarizer.py
 │   └── test_synthesizer.py
@@ -229,21 +240,12 @@ AI Research Assistant/
 The FastAPI backend exposes the following REST endpoints:
 
 * **GET `/api/health`**: Returns system health status, Gemini model configuration, and Tavily key validation.
-* **POST `/api/research`**: Accepts the full `ResearchRequest` payload and executes the 6-stage pipeline, saving the `.md` report to `output/`:
-  ```json
-  {
-    "topic": "string",
-    "depth": "quick | standard | deep",
-    "date_filter": "any | past_year | past_5_years | custom",
-    "custom_start_date": "YYYY-MM-DD",
-    "custom_end_date": "YYYY-MM-DD",
-    "domain_mode": "none | include | exclude",
-    "domain_list": ["arxiv.org", "nature.com"],
-    "source_category": "general | news | finance"
-  }
-  ```
-* **GET `/api/reports`**: Returns a list of all saved reports in `output/` sorted by modification date, including filename, path, file size, and timestamp.
-* **GET `/api/reports/{filename}`**: Fetches the raw markdown content of a specific saved report for viewing in the frontend.
+* **POST `/api/research`**: Accepts the full `ResearchRequest` payload and executes the 6-stage pipeline, saving the `.md` report to `output/`.
+* **POST `/api/research/follow-up`**: Executes a scoped mini-pipeline answering a drill-down question on a specific takeaway or report section.
+* **POST `/api/research/compare`**: Executes a 5-stage comparative analysis for `topic_a` vs `topic_b` across inferred comparison dimensions.
+* **POST `/api/research/continue`**: Continues an existing report or session with a new research pass, returning a `ResearchSession` with delta summary.
+* **GET `/api/reports`**: Returns a list of all saved reports in `output/` sorted by modification date.
+* **GET `/api/reports/{filename}`**: Fetches the raw markdown content of a specific saved report.
 
 ## Performance Benchmarks
 
@@ -253,7 +255,9 @@ The FastAPI backend exposes the following REST endpoints:
 - **Per-Source Summarization**: ~2.5s for grounded Gemini processing
 - **Report Synthesis**: ~2.8s for executive summary and section breakdown
 - **Citation Audit & Staleness Warning**: < 10ms for citation verification, corroboration mapping, and date recency calculation
-- **Test Coverage**: 23 unit & integration tests (22 offline passed, 1 live integration skipped by default)
+- **Follow-Up Scoped Mini-Pipeline**: ~1.5s (runs 1 query, summarizes only new sources)
+- **Comparative Research Pipeline**: ~4.2s (infers dimensions, runs dual retrieval passes per dimension)
+- **Test Coverage**: 29 unit & integration tests (28 offline passed, 1 live integration skipped by default)
 
 ## Features in Detail
 
