@@ -3,6 +3,7 @@ import sys
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from src.config import Config
 from src.services.gemini_client import GeminiService
@@ -27,7 +28,7 @@ logging.basicConfig(
 logger = logging.getLogger("research_assistant")
 
 
-from src.models.schemas import ResearchReport, FilterSettings
+from src.models.schemas import FilterSettings
 
 
 def run_research_pipeline(

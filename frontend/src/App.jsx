@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import "./index.css";
 import { checkHealth, runResearch, fetchReports, fetchReportByFilename } from "./api";
+import { CustomSelectDropdown, CustomDatePicker } from "./components";
 
 const STAGES = [
   { id: 1, label: "Planning search queries with Gemini" },
@@ -22,6 +23,25 @@ const DEPTH_OPTIONS = [
   { id: "quick", label: "Quick Scan", desc: "2 queries · 6 sources" },
   { id: "standard", label: "Standard", desc: "4 queries · 12 sources" },
   { id: "deep", label: "Deep Research", desc: "6 queries · 20 sources" },
+];
+
+const DATE_FILTER_OPTIONS = [
+  { value: "any", label: "Any time" },
+  { value: "past_year", label: "Past year" },
+  { value: "past_5_years", label: "Past 5 years" },
+  { value: "custom", label: "Custom range…" },
+];
+
+const DOMAIN_MODE_OPTIONS = [
+  { value: "none", label: "Off", desc: "Search all domains" },
+  { value: "include", label: "Include only", desc: "Restrict to listed domains" },
+  { value: "exclude", label: "Exclude", desc: "Block listed domains" },
+];
+
+const SOURCE_CATEGORY_OPTIONS = [
+  { value: "general", label: "General" },
+  { value: "news", label: "News" },
+  { value: "finance", label: "Finance" },
 ];
 
 export default function App() {
@@ -245,6 +265,8 @@ export default function App() {
   const takeawayCount = report?.key_takeaways?.length ?? 0;
   const sectionCount = report?.sections?.length ?? 0;
 
+  const filtersActive = dateFilter !== "any" || domainMode !== "none" || sourceCategory !== "general";
+
   return (
     <div className="app">
       {/* ── Header ── */}
@@ -262,13 +284,12 @@ export default function App() {
           </button>
           {health && (
             <span
-              className={`status-dot ${
-                health.status === "healthy" &&
-                health.tavily_configured &&
-                health.gemini_configured
+              className={`status-dot ${health.status === "healthy" &&
+                  health.tavily_configured &&
+                  health.gemini_configured
                   ? "ok"
                   : "warn"
-              }`}
+                }`}
             />
           )}
           <span className="header-badge">Research AI</span>
@@ -299,18 +320,17 @@ export default function App() {
         {health && (
           <div className="status-bar" style={{ paddingLeft: 0, marginBottom: 12 }}>
             <span
-              className={`status-dot ${
-                health.status === "healthy" &&
-                health.tavily_configured &&
-                health.gemini_configured
+              className={`status-dot ${health.status === "healthy" &&
+                  health.tavily_configured &&
+                  health.gemini_configured
                   ? "ok"
                   : "warn"
-              }`}
+                }`}
             />
             <span>
               {health.status === "healthy" &&
-              health.tavily_configured &&
-              health.gemini_configured
+                health.tavily_configured &&
+                health.gemini_configured
                 ? `Backend connected · Model: ${health.model}`
                 : "Backend connected — check API keys in .env"}
             </span>
@@ -341,7 +361,7 @@ export default function App() {
           <div className="search-footer">
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span className="search-hint">Enter to submit · Shift+Enter for new line</span>
-              
+
               {/* Depth selector */}
               <div className="depth-selector">
                 {DEPTH_OPTIONS.map((opt) => (
@@ -360,14 +380,14 @@ export default function App() {
               {/* Filter Panel Toggle */}
               <button
                 type="button"
-                className={`filter-toggle-btn${showFilterPanel || dateFilter !== "any" || domainMode !== "none" || sourceCategory !== "general" ? " active" : ""}`}
+                className={`filter-toggle-btn${showFilterPanel || filtersActive ? " active" : ""}`}
                 onClick={() => setShowFilterPanel(!showFilterPanel)}
                 disabled={loading}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
                 </svg>
-                Filters {dateFilter !== "any" || domainMode !== "none" || sourceCategory !== "general" ? "• Active" : ""}
+                Filters {filtersActive ? "• Active" : ""}
               </button>
             </div>
 
@@ -380,70 +400,57 @@ export default function App() {
           {showFilterPanel && (
             <div className="filter-panel">
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+
                 {/* Date range filter */}
-                <div className="filter-group" style={{ flex: 1, minWidth: 200 }}>
-                  <label className="filter-label">📅 Date Range</label>
-                  <select
-                    className="filter-select"
+                <div className="filter-group" style={{ flex: 1, minWidth: 180 }}>
+                  <label className="filter-label"> Date Range</label>
+                  <CustomSelectDropdown
                     value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
+                    onChange={setDateFilter}
+                    options={DATE_FILTER_OPTIONS}
                     disabled={loading}
-                  >
-                    <option value="any">Any time</option>
-                    <option value="past_year">Past year</option>
-                    <option value="past_5_years">Past 5 years</option>
-                    <option value="custom">Custom range...</option>
-                  </select>
+                  />
                   {dateFilter === "custom" && (
                     <div className="date-custom-row">
-                      <input
-                        type="date"
-                        className="filter-input"
+                      <CustomDatePicker
                         value={customStartDate}
-                        onChange={(e) => setCustomStartDate(e.target.value)}
-                        placeholder="Start Date"
+                        onChange={setCustomStartDate}
+                        placeholder="Start date"
+                        max={customEndDate || undefined}
                         disabled={loading}
                       />
-                      <span style={{ fontSize: 11, color: "var(--text-3)" }}>to</span>
-                      <input
-                        type="date"
-                        className="filter-input"
+                      <span style={{ fontSize: 11, color: "var(--text-3)", flexShrink: 0 }}>to</span>
+                      <CustomDatePicker
                         value={customEndDate}
-                        onChange={(e) => setCustomEndDate(e.target.value)}
-                        placeholder="End Date"
+                        onChange={setCustomEndDate}
+                        placeholder="End date"
+                        min={customStartDate || undefined}
                         disabled={loading}
                       />
                     </div>
                   )}
                 </div>
 
-                {/* Domain filter mode */}
-                <div className="filter-group" style={{ flex: 1, minWidth: 220 }}>
-                  <label className="filter-label">🌐 Domain Filter</label>
-                  <div className="domain-input-row">
-                    <select
-                      className="filter-select"
-                      value={domainMode}
-                      onChange={(e) => setDomainMode(e.target.value)}
+                {/* Domain filter */}
+                <div className="filter-group" style={{ flex: 1, minWidth: 200 }}>
+                  <label className="filter-label"> Domain Filter</label>
+                  <CustomSelectDropdown
+                    value={domainMode}
+                    onChange={setDomainMode}
+                    options={DOMAIN_MODE_OPTIONS}
+                    disabled={loading}
+                  />
+                  {domainMode !== "none" && (
+                    <input
+                      type="text"
+                      className="filter-input"
+                      placeholder="e.g. arxiv.org, nature.com (Enter to add)"
+                      value={domainInput}
+                      onChange={(e) => setDomainInput(e.target.value)}
+                      onKeyDown={handleAddDomain}
                       disabled={loading}
-                    >
-                      <option value="none">Off (All domains)</option>
-                      <option value="include">Include only</option>
-                      <option value="exclude">Exclude</option>
-                    </select>
-                    {domainMode !== "none" && (
-                      <input
-                        type="text"
-                        className="filter-input"
-                        style={{ flex: 1 }}
-                        placeholder="e.g. arxiv.org, *.edu (Enter)"
-                        value={domainInput}
-                        onChange={(e) => setDomainInput(e.target.value)}
-                        onKeyDown={handleAddDomain}
-                        disabled={loading}
-                      />
-                    )}
-                  </div>
+                    />
+                  )}
                   {domainMode !== "none" && domainList.length > 0 && (
                     <div className="domain-tags">
                       {domainList.map((d) => (
@@ -463,19 +470,16 @@ export default function App() {
                 </div>
 
                 {/* Source Category */}
-                <div className="filter-group" style={{ width: 140 }}>
-                  <label className="filter-label">📰 Topic Scope</label>
-                  <select
-                    className="filter-select"
+                <div className="filter-group" style={{ width: 160 }}>
+                  <label className="filter-label"> Topic Scope</label>
+                  <CustomSelectDropdown
                     value={sourceCategory}
-                    onChange={(e) => setSourceCategory(e.target.value)}
+                    onChange={setSourceCategory}
+                    options={SOURCE_CATEGORY_OPTIONS}
                     disabled={loading}
-                  >
-                    <option value="general">General</option>
-                    <option value="news">News</option>
-                    <option value="finance">Finance</option>
-                  </select>
+                  />
                 </div>
+
               </div>
             </div>
           )}
@@ -545,10 +549,10 @@ export default function App() {
                   {report.filter_settings.date_filter === "past_year"
                     ? "Past year"
                     : report.filter_settings.date_filter === "past_5_years"
-                    ? "Past 5 years"
-                    : report.filter_settings.date_filter === "custom"
-                    ? `Custom: ${report.filter_settings.custom_start_date || "?"} to ${report.filter_settings.custom_end_date || "?"}`
-                    : "Any time"}
+                      ? "Past 5 years"
+                      : report.filter_settings.date_filter === "custom"
+                        ? `Custom: ${report.filter_settings.custom_start_date || "?"} to ${report.filter_settings.custom_end_date || "?"}`
+                        : "Any time"}
                 </span>
 
                 {report.filter_settings.domain_mode !== "none" && report.filter_settings.domain_list?.length > 0 && (
@@ -589,7 +593,7 @@ export default function App() {
                     {isSpeaking ? "Stop Audio" : "Listen Summary"}
                   </button>
                 )}
-                
+
                 <button className="action-btn" onClick={handlePrint}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <polyline points="6 9 6 2 18 2 18 9" />
@@ -662,7 +666,7 @@ export default function App() {
                     </>
                   )}
 
-                  {/* Report sections with interactive citation hover popovers */}
+                  {/* Report sections */}
                   {report.sections?.length > 0 && (
                     <>
                       <div className="label" style={{ marginTop: 24 }}>Report Sections</div>

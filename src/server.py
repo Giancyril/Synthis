@@ -5,11 +5,11 @@ from pathlib import Path
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.config import Config
 from src.main import run_research_pipeline
-from src.models.schemas import ResearchReport
+from src.models.schemas import ResearchReport, FilterSettings
 from src.output.markdown_export import render_markdown
 
 logger = logging.getLogger("server")
@@ -30,7 +30,6 @@ app.add_middleware(
 )
 
 
-from src.models.schemas import ResearchReport, FilterSettings
 
 
 class ResearchRequest(BaseModel):
