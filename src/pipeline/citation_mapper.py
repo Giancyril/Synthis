@@ -82,3 +82,68 @@ class CitationMapper:
 
         return updated_sections, updated_takeaways, warnings
 
+    @staticmethod
+    def audit_recency_and_confidence(
+        sources: List[Source], existing_note: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Audits publication dates of sources for staleness (> 12 months median age) or missing dates.
+        Appends recency warnings to the existing confidence_note.
+        """
+        from datetime import datetime, date
+
+        if not sources:
+            return existing_note
+
+        notes = [existing_note] if existing_note else []
+
+        today = date.today()
+        ages_in_days = []
+        missing_date_count = 0
+
+        for s in sources:
+            p_date_str = s.published_date
+            if not p_date_str or not str(p_date_str).strip():
+                missing_date_count += 1
+                continue
+
+            p_str = str(p_date_str).strip()
+            parsed_date = None
+
+            # Try parsing YYYY-MM-DD or ISO timestamp
+            if len(p_str) >= 10:
+                try:
+                    parsed_date = datetime.strptime(p_str[:10], "%Y-%m-%d").date()
+                except ValueError:
+                    pass
+            elif len(p_str) == 4 and p_str.isdigit():
+                try:
+                    parsed_date = date(int(p_str), 1, 1)
+                except ValueError:
+                    pass
+
+            if parsed_date:
+                age = (today - parsed_date).days
+                if age >= 0:
+                    ages_in_days.append(age)
+            else:
+                missing_date_count += 1
+
+        total_sources = len(sources)
+        if total_sources > 0 and (missing_date_count / total_sources) > 0.5:
+            notes.append("Publish dates are unavailable for most sources in this report.")
+
+        if ages_in_days:
+            ages_in_days.sort()
+            mid = len(ages_in_days) // 2
+            if len(ages_in_days) % 2 != 0:
+                median_age = ages_in_days[mid]
+            else:
+                median_age = (ages_in_days[mid - 1] + ages_in_days[mid]) / 2
+
+            if median_age > 365:
+                notes.append("Most sources in this report are over a year old — consider re-running with a narrower date range if recent developments matter for this topic.")
+
+        return " ".join(notes) if notes else None
+
+

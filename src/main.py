@@ -99,7 +99,7 @@ def run_research_pipeline(
     print(f"   └─ Generated {len(takeaways)} key takeaways, {len(raw_sections)} report sections, and {len(conflicts)} conflicting topic groups.")
 
     # Step 6: Citation Mapping & Grounding Validation
-    print("\n [6/6] Validating inline citations and grounding...")
+    print("\n [6/6] Validating inline citations, grounding, and source recency...")
     mapper = CitationMapper()
     mapped_sections, mapped_takeaways, warnings = mapper.validate_and_map_citations(
         raw_sections, summarized_sources, takeaways=takeaways
@@ -107,6 +107,9 @@ def run_research_pipeline(
     if warnings:
         for w in warnings:
             print(f"   ⚠️  {w}")
+
+    # Recency / staleness audit — extends conf_note in-place
+    final_conf_note = mapper.audit_recency_and_confidence(summarized_sources, existing_note=conf_note)
 
     # Build final Pydantic ResearchReport
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -117,7 +120,7 @@ def run_research_pipeline(
         sections=mapped_sections,
         sources=summarized_sources,
         conflicting_information=conflicts,
-        confidence_note=conf_note,
+        confidence_note=final_conf_note,
         filter_settings=filter_settings,
     )
 

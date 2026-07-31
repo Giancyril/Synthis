@@ -1243,3 +1243,30 @@ body {
   .section-content { color: #18181b !important; }
 }
 
+/* ── Recency / Staleness Warning Banner ────── */
+.confidence-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  color: var(--text-1);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.confidence-banner svg {
+  color: var(--amber);
+  margin-top: 2px;
+}
+.confidence-banner-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 4px;
+}

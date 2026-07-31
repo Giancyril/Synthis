@@ -67,3 +67,45 @@ def test_citation_mapper_takeaway_corroboration():
     assert updated_takeaways[0].corroboration_count == 2
     assert updated_takeaways[1].corroboration_count == 1
 
+
+def test_citation_mapper_recency_audit_staleness():
+    from datetime import date, timedelta
+    from src.pipeline.citation_mapper import CitationMapper
+
+    old_date = (date.today() - timedelta(days=400)).strftime("%Y-%m-%d")
+    sources = [
+        Source(id="S1", url="https://a.com", title="S1", snippet="S1", published_date=old_date),
+        Source(id="S2", url="https://b.com", title="S2", snippet="S2", published_date=old_date),
+    ]
+    note = CitationMapper.audit_recency_and_confidence(sources, existing_note=None)
+    assert note is not None
+    assert "year old" in note
+
+
+def test_citation_mapper_recency_audit_missing_dates():
+    from src.pipeline.citation_mapper import CitationMapper
+
+    sources = [
+        Source(id="S1", url="https://a.com", title="S1", snippet="S1", published_date=None),
+        Source(id="S2", url="https://b.com", title="S2", snippet="S2", published_date=None),
+        Source(id="S3", url="https://c.com", title="S3", snippet="S3", published_date=None),
+    ]
+    note = CitationMapper.audit_recency_and_confidence(sources, existing_note=None)
+    assert note is not None
+    assert "unavailable" in note
+
+
+def test_citation_mapper_recency_audit_fresh_sources():
+    from datetime import date, timedelta
+    from src.pipeline.citation_mapper import CitationMapper
+
+    recent_date = (date.today() - timedelta(days=30)).strftime("%Y-%m-%d")
+    sources = [
+        Source(id="S1", url="https://a.com", title="S1", snippet="S1", published_date=recent_date),
+        Source(id="S2", url="https://b.com", title="S2", snippet="S2", published_date=recent_date),
+    ]
+    # Fresh sources should not trigger any warning
+    note = CitationMapper.audit_recency_and_confidence(sources, existing_note=None)
+    assert note is None
+
+
