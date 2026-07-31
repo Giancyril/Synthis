@@ -64,6 +64,16 @@ def render_markdown(report: ResearchReport) -> str:
         lines.append("- No key takeaways generated.")
     lines.append("")
 
+    if report.conflicting_information:
+        lines.append("## Conflicting Information & Disagreements")
+        lines.append("")
+        for conflict in report.conflicting_information:
+            lines.append(f"### Disputed: {conflict.topic}")
+            for pos in conflict.positions:
+                sids_str = ", ".join([f"[{sid}]" for sid in pos.source_ids])
+                lines.append(f"- **Claim:** {pos.claim} *({sids_str})*")
+            lines.append("")
+
     lines.append("---")
     lines.append("")
 

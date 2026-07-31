@@ -684,6 +684,32 @@ export default function App() {
                     </>
                   )}
 
+                  {/* Conflicting Information Card */}
+                  {report.conflicting_information?.length > 0 && (
+                    <div style={{ marginTop: 24, marginBottom: 28 }}>
+                      <div className="label">⚠️ Conflicting Information & Disagreements</div>
+                      <div className="conflict-list">
+                        {report.conflicting_information.map((item, idx) => (
+                          <div key={idx} className="conflict-card">
+                            <div className="conflict-topic">Disputed: {item.topic}</div>
+                            <div className="conflict-positions">
+                              {item.positions?.map((pos, pIdx) => (
+                                <div key={pIdx} className="conflict-position">
+                                  <div className="conflict-claim">{pos.claim}</div>
+                                  <div className="conflict-sources">
+                                    {pos.source_ids?.map((sid) => (
+                                      <span key={sid} className="source-badge">{sid}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Report sections */}
                   {report.sections?.length > 0 && (
                     <>

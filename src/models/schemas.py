@@ -64,11 +64,23 @@ class KeyTakeaway(BaseModel):
     corroboration_count: int = 1
 
 
+class ConflictPosition(BaseModel):
+    claim: str
+    source_ids: List[str] = Field(default_factory=list)
+
+
+class ConflictingTopic(BaseModel):
+    topic: str
+    positions: List[ConflictPosition] = Field(default_factory=list)
+
+
 class ResearchReport(BaseModel):
     topic: str
     generated_at: str
     key_takeaways: List[KeyTakeaway] = Field(default_factory=list)
     sections: List[ReportSection] = Field(default_factory=list)
     sources: List[Source] = Field(default_factory=list)
+    conflicting_information: List[ConflictingTopic] = Field(default_factory=list)
     confidence_note: Optional[str] = None
     filter_settings: Optional[FilterSettings] = None
+

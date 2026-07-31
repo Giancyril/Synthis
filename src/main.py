@@ -93,10 +93,10 @@ def run_research_pipeline(
     print(f"   └─ Completed summaries for {len(summarized_sources)} sources.")
 
     # Step 5: Synthesis
-    print("\n [5/6] Synthesizing report sections and key takeaways...")
+    print("\n [5/6] Synthesizing report sections, key takeaways, and conflict analysis...")
     synthesizer = ReportSynthesizer(gemini_svc)
-    takeaways, raw_sections, conf_note = synthesizer.synthesize_report(topic, summarized_sources)
-    print(f"   └─ Generated {len(takeaways)} key takeaways and {len(raw_sections)} report sections.")
+    takeaways, raw_sections, conflicts, conf_note = synthesizer.synthesize_report(topic, summarized_sources)
+    print(f"   └─ Generated {len(takeaways)} key takeaways, {len(raw_sections)} report sections, and {len(conflicts)} conflicting topic groups.")
 
     # Step 6: Citation Mapping & Grounding Validation
     print("\n [6/6] Validating inline citations and grounding...")
@@ -116,6 +116,7 @@ def run_research_pipeline(
         key_takeaways=mapped_takeaways,
         sections=mapped_sections,
         sources=summarized_sources,
+        conflicting_information=conflicts,
         confidence_note=conf_note,
         filter_settings=filter_settings,
     )

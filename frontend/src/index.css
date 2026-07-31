@@ -383,6 +383,50 @@ body {
   border: 1px solid var(--border);
 }
 
+/* ── Conflicting Information Card ─────────── */
+.conflict-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.conflict-card {
+  background: rgba(251, 113, 133, 0.05);
+  border: 1px solid rgba(251, 113, 133, 0.2);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+.conflict-topic {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rose);
+  margin-bottom: 12px;
+}
+.conflict-positions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.conflict-position {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.conflict-claim {
+  font-size: 12px;
+  color: var(--text-1);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.conflict-sources {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
 /* ── Sections ──────────────────────────────── */
 .section-block { margin-bottom: 24px; }
 .section-heading {
