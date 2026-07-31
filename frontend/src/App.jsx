@@ -12,6 +12,14 @@ const STAGES = [
   { id: 6, label: "Mapping and validating citations" },
 ];
 
+const CMP_STAGES = [
+  { id: 1, label: "Inferring comparison dimensions for Topic A vs B" },
+  { id: 2, label: "Executing batched retrieval for both topics" },
+  { id: 3, label: "Filtering and deduplicating web sources" },
+  { id: 4, label: "Summarizing per-source content with Gemini" },
+  { id: 5, label: "Synthesizing side-by-side comparative analysis" },
+];
+
 const EXAMPLE_TOPICS = [
   "Solid state battery technology 2026",
   "AI agents in software engineering",
@@ -161,16 +169,17 @@ export default function App() {
   }
 
 
-  // Stage animation timing adjusts based on depth
+  // Stage animation timing adjusts based on depth and mode
   useEffect(() => {
     if (!loading) { setStageIdx(-1); return; }
     setStageIdx(0);
-    const delay = depth === "quick" ? 3000 : depth === "deep" ? 7000 : 5000;
-    const timers = STAGES.map((_, i) =>
+    const activeStages = compareMode ? CMP_STAGES : STAGES;
+    const delay = depth === "quick" ? 1500 : depth === "deep" ? 3500 : 2500;
+    const timers = activeStages.map((_, i) =>
       setTimeout(() => setStageIdx(i), i * delay)
     );
     return () => timers.forEach(clearTimeout);
-  }, [loading, depth]);
+  }, [loading, depth, compareMode]);
 
   // Clean up speech synthesis on unmount
   useEffect(() => {
@@ -519,7 +528,6 @@ export default function App() {
       {/* ── Header ── */}
       <header className="header">
         <div className="header-logo" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <img src="/favicon.svg" alt="Synthis Logo" style={{ width: 26, height: 26, borderRadius: 6 }} />
           Synthis
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -796,12 +804,16 @@ export default function App() {
             <div className="progress-header">
               <div className="spinner" />
               <div>
-                <div className="progress-title">Generating research report ({depth} mode)…</div>
-                <div className="progress-topic">{topic}</div>
+                <div className="progress-title">
+                  {compareMode ? `Generating comparative report (${depth} mode)…` : `Generating research report (${depth} mode)…`}
+                </div>
+                <div className="progress-topic">
+                  {compareMode ? `${topic} vs ${topicB}` : topic}
+                </div>
               </div>
             </div>
             <div className="stages">
-              {STAGES.map((stage, i) => {
+              {(compareMode ? CMP_STAGES : STAGES).map((stage, i) => {
                 const state =
                   i < stageIdx ? "done" : i === stageIdx ? "active" : "pending";
                 return (
