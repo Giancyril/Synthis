@@ -61,6 +61,7 @@ class ReportSection(BaseModel):
 class KeyTakeaway(BaseModel):
     text: str
     source_ids: List[str] = Field(default_factory=list)  # source IDs supporting this takeaway
+    corroboration_count: int = 1
 
 
 class ResearchReport(BaseModel):

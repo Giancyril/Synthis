@@ -101,7 +101,9 @@ def run_research_pipeline(
     # Step 6: Citation Mapping & Grounding Validation
     print("\n [6/6] Validating inline citations and grounding...")
     mapper = CitationMapper()
-    mapped_sections, warnings = mapper.validate_and_map_citations(raw_sections, summarized_sources)
+    mapped_sections, mapped_takeaways, warnings = mapper.validate_and_map_citations(
+        raw_sections, summarized_sources, takeaways=takeaways
+    )
     if warnings:
         for w in warnings:
             print(f"   ⚠️  {w}")
@@ -111,7 +113,7 @@ def run_research_pipeline(
     report = ResearchReport(
         topic=topic,
         generated_at=now_str,
-        key_takeaways=takeaways,
+        key_takeaways=mapped_takeaways,
         sections=mapped_sections,
         sources=summarized_sources,
         confidence_note=conf_note,

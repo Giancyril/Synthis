@@ -663,13 +663,20 @@ export default function App() {
                             <div className="takeaway-bullet" />
                             <div>
                               <div className="takeaway-text">{kt.text}</div>
-                              {kt.source_ids?.length > 0 && (
-                                <div className="takeaway-sources">
+                                <div className="takeaway-sources" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                                  {kt.corroboration_count >= 2 ? (
+                                    <span className="corrob-badge multi">
+                                      Corroborated by {kt.corroboration_count} sources
+                                    </span>
+                                  ) : (
+                                    <span className="corrob-badge single">
+                                      Single-sourced
+                                    </span>
+                                  )}
                                   {kt.source_ids.map((sid) => (
                                     <span key={sid} className="source-badge">{sid}</span>
                                   ))}
                                 </div>
-                              )}
                             </div>
                           </div>
                         ))}

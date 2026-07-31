@@ -364,6 +364,24 @@ body {
   border-radius: 4px;
   padding: 1px 5px;
 }
+.corrob-badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 7px;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+}
+.corrob-badge.multi {
+  color: var(--emerald);
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+.corrob-badge.single {
+  color: var(--text-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
 
 /* ── Sections ──────────────────────────────── */
 .section-block { margin-bottom: 24px; }

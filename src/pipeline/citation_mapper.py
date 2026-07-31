@@ -1,19 +1,22 @@
 import re
 import logging
-from typing import List, Set, Tuple
-from src.models.schemas import Source, ReportSection, Citation
+from typing import List, Set, Tuple, Optional
+from src.models.schemas import Source, ReportSection, Citation, KeyTakeaway
 
 logger = logging.getLogger(__name__)
 
 
 class CitationMapper:
     def validate_and_map_citations(
-        self, sections: List[ReportSection], valid_sources: List[Source]
-    ) -> Tuple[List[ReportSection], List[str]]:
+        self,
+        sections: List[ReportSection],
+        valid_sources: List[Source],
+        takeaways: Optional[List[KeyTakeaway]] = None,
+    ) -> Tuple[List[ReportSection], List[KeyTakeaway], List[str]]:
         """
         Parses [S#] markers in section prose content, validates against valid_sources,
-        creates Citation models, and flags ungrounded sections.
-        Returns (updated_sections, list_of_grounding_warnings).
+        creates Citation models, flags ungrounded sections, and computes takeaway corroboration counts.
+        Returns (updated_sections, updated_takeaways, list_of_grounding_warnings).
         """
         valid_source_ids: Set[str] = {s.id for s in valid_sources}
         source_map = {s.id: s for s in valid_sources}
@@ -64,4 +67,18 @@ class CitationMapper:
             )
             updated_sections.append(updated_sec)
 
-        return updated_sections, warnings
+        updated_takeaways: List[KeyTakeaway] = []
+        if takeaways:
+            for kt in takeaways:
+                valid_sids = [sid for sid in kt.source_ids if sid in valid_source_ids]
+                distinct_count = len(set(valid_sids))
+                updated_kt = kt.model_copy(
+                    update={
+                        "source_ids": valid_sids,
+                        "corroboration_count": max(1, distinct_count) if valid_sids else 1,
+                    }
+                )
+                updated_takeaways.append(updated_kt)
+
+        return updated_sections, updated_takeaways, warnings
+
