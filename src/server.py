@@ -188,6 +188,63 @@ def get_report_by_filename(filename: str):
         )
 
 
+class FollowUpRequest(BaseModel):
+    report: Optional[ResearchReport] = None
+    filename: Optional[str] = None
+    target_type: str  # "takeaway" | "section"
+    target_id: str
+    question: str
+
+
+@app.post("/api/research/follow-up", response_model=dict, tags=["Research"])
+def execute_followup(req: FollowUpRequest):
+    if not req.question or not req.question.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Follow-up question cannot be empty.",
+        )
+
+    report_obj = req.report
+    if not report_obj and req.filename:
+        safe_name = Path(req.filename).name
+        p = Path("output") / safe_name
+        if p.exists():
+            # If JSON exists, load schema directly
+            json_p = p.with_suffix(".json")
+            if json_p.exists():
+                import json
+                data = json.loads(json_p.read_text(encoding="utf-8"))
+                report_obj = ResearchReport.model_validate(data)
+
+    if not report_obj:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A valid ResearchReport object or filename must be provided.",
+        )
+
+    try:
+        from src.pipeline.followup_pipeline import FollowUpPipeline
+        import uuid
+
+        pipeline = FollowUpPipeline()
+        follow_up_id = f"fu_{uuid.uuid4().hex[:8]}"
+        result = pipeline.execute_followup(
+            report=report_obj,
+            target_type=req.target_type,
+            target_id=req.target_id,
+            question=req.question.strip(),
+            follow_up_id=follow_up_id,
+        )
+        return {"status": "success", "result": result.model_dump()}
+    except Exception as exc:
+        logger.error(f"Follow-up execution failed: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Follow-up pipeline failed: {str(exc)}",
+        )
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("src.server:app", host="127.0.0.1", port=8000, reload=True)
+
