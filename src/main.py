@@ -27,11 +27,15 @@ logging.basicConfig(
 logger = logging.getLogger("research_assistant")
 
 
+from src.models.schemas import ResearchReport, FilterSettings
+
+
 def run_research_pipeline(
     topic: str,
     output_path: str = "output/report.md",
     format_type: str = "markdown",
     depth: str = "standard",
+    filter_settings: Optional[FilterSettings] = None,
     config: Config = None,
 ) -> ResearchReport:
     """
@@ -40,6 +44,9 @@ def run_research_pipeline(
     """
     if config is None:
         config = Config(check_keys=True)
+
+    if filter_settings is None:
+        filter_settings = FilterSettings()
 
     # Configure depth parameters
     depth_settings = {
@@ -69,7 +76,7 @@ def run_research_pipeline(
     # Step 2: Retrieval
     print("\n [2/6] Retrieving web sources via Tavily API...")
     retriever = Retriever(tavily_svc)
-    raw_sources = retriever.retrieve_sources(queries)
+    raw_sources = retriever.retrieve_sources(queries, filter_settings=filter_settings)
     print(f"   └─ Retrieved {len(raw_sources)} raw search results.")
 
     # Step 3: Filtering & Deduplication
@@ -107,6 +114,7 @@ def run_research_pipeline(
         sections=mapped_sections,
         sources=summarized_sources,
         confidence_note=conf_note,
+        filter_settings=filter_settings,
     )
 
     # Export report to disk

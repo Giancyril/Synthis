@@ -30,10 +30,29 @@ app.add_middleware(
 )
 
 
+from src.models.schemas import ResearchReport, FilterSettings
+
+
 class ResearchRequest(BaseModel):
     topic: str
     output_filename: Optional[str] = None
     depth: Optional[str] = "standard"
+    date_filter: Optional[str] = "any"
+    custom_start_date: Optional[str] = None
+    custom_end_date: Optional[str] = None
+    domain_mode: Optional[str] = "none"
+    domain_list: List[str] = Field(default_factory=list)
+    source_category: Optional[str] = "general"
+
+    def get_filter_settings(self) -> FilterSettings:
+        return FilterSettings(
+            date_filter=self.date_filter or "any",
+            custom_start_date=self.custom_start_date,
+            custom_end_date=self.custom_end_date,
+            domain_mode=self.domain_mode or "none",
+            domain_list=self.domain_list or [],
+            source_category=self.source_category or "general",
+        )
 
 
 class HealthResponse(BaseModel):
@@ -72,6 +91,15 @@ def execute_research(req: ResearchRequest):
             detail="Research topic cannot be empty.",
         )
 
+    # Validate filter settings
+    try:
+        filter_settings = req.get_filter_settings()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        )
+
     try:
         cfg = Config(check_keys=True)
     except ValueError as exc:
@@ -96,6 +124,7 @@ def execute_research(req: ResearchRequest):
             output_path=str(out_path),
             format_type="markdown",
             depth=req.depth or "standard",
+            filter_settings=filter_settings,
             config=cfg,
         )
 

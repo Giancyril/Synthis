@@ -11,7 +11,10 @@ class Retriever:
         self.tavily_service = tavily_service
 
     def retrieve_sources(
-        self, queries: List[str], max_results_per_query: int = 5
+        self,
+        queries: List[str],
+        max_results_per_query: int = 5,
+        filter_settings: Optional[FilterSettings] = None,
     ) -> List[Source]:
         """
         Executes Tavily searches for a list of queries and constructs initial Source objects.

@@ -1,5 +1,39 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, List
+from datetime import datetime, date
+
+
+class FilterSettings(BaseModel):
+    date_filter: str = "any"  # "any" | "past_year" | "past_5_years" | "custom"
+    custom_start_date: Optional[str] = None  # YYYY-MM-DD
+    custom_end_date: Optional[str] = None    # YYYY-MM-DD
+    domain_mode: str = "none"  # "none" | "include" | "exclude"
+    domain_list: List[str] = Field(default_factory=list)
+    source_category: str = "general"  # "general" | "news" | "finance"
+
+    @model_validator(mode="after")
+    def validate_filter_rules(self):
+        if self.date_filter == "custom":
+            if not self.custom_start_date or not self.custom_end_date:
+                raise ValueError("Both custom_start_date and custom_end_date are required when date_filter is 'custom'.")
+            
+            try:
+                start_dt = datetime.strptime(self.custom_start_date, "%Y-%m-%d").date()
+                end_dt = datetime.strptime(self.custom_end_date, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValueError("Dates must be in YYYY-MM-DD format.")
+
+            if start_dt > end_dt:
+                raise ValueError(f"custom_start_date ({self.custom_start_date}) cannot be after custom_end_date ({self.custom_end_date}).")
+            
+            today = date.today()
+            if end_dt > today:
+                raise ValueError(f"custom_end_date ({self.custom_end_date}) cannot be in the future.")
+
+        if self.domain_mode in ("include", "exclude") and not self.domain_list:
+            # Clean empty strings if any
+            pass
+        return self
 
 
 class Source(BaseModel):
@@ -35,3 +69,4 @@ class ResearchReport(BaseModel):
     sections: List[ReportSection] = Field(default_factory=list)
     sources: List[Source] = Field(default_factory=list)
     confidence_note: Optional[str] = None
+    filter_settings: Optional[FilterSettings] = None
