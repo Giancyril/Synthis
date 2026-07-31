@@ -127,5 +127,25 @@ class ResearchReport(BaseModel):
     follow_ups: List[FollowUpResult] = Field(default_factory=list)
 
 
+class PassMetadata(BaseModel):
+    report_id: str
+    run_at: str
+    depth: str = "standard"
+    filters_used: Optional[FilterSettings] = None
+    additional_context: Optional[str] = None
+
+
+class ResearchSession(BaseModel):
+    session_id: str
+    topic: str
+    created_at: str
+    last_updated_at: str
+    passes: List[PassMetadata] = Field(default_factory=list)
+    merged_sources: List[Source] = Field(default_factory=list)
+    merged_takeaways: List[KeyTakeaway] = Field(default_factory=list)
+    what_changed_summary: Optional[str] = None
+
+
+
 
 
