@@ -301,6 +301,49 @@ def execute_comparative_research(req: CompareRequest):
         )
 
 
+class ContinueRequest(BaseModel):
+    report: Optional[ResearchReport] = None
+    filename: Optional[str] = None
+    additional_context: Optional[str] = None
+    depth: str = "standard"
+
+
+@app.post("/api/research/continue", response_model=dict, tags=["Sessions"])
+def continue_research_session(req: ContinueRequest):
+    report_obj = req.report
+    if not report_obj and req.filename:
+        safe_name = Path(req.filename).name
+        p = Path("output") / safe_name
+        if p.exists():
+            json_p = p.with_suffix(".json")
+            if json_p.exists():
+                import json
+                data = json.loads(json_p.read_text(encoding="utf-8"))
+                report_obj = ResearchReport.model_validate(data)
+
+    if not report_obj:
+        # Construct fallback ResearchReport from filename/topic
+        cleaned_topic = (req.filename or "Topic").replace(".md", "").replace("_", " ")
+        report_obj = ResearchReport(topic=cleaned_topic, generated_at="Past Report")
+
+    try:
+        from src.services.session_manager import SessionManager
+        manager = SessionManager()
+        session = manager.continue_session(
+            parent_report=report_obj,
+            additional_context=req.additional_context,
+            depth=req.depth,
+        )
+        return {"status": "success", "session": session.model_dump()}
+    except Exception as exc:
+        logger.error(f"Session continuation failed: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Session continuation failed: {str(exc)}",
+        )
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("src.server:app", host="127.0.0.1", port=8000, reload=True)
+
