@@ -74,7 +74,29 @@ class ConflictingTopic(BaseModel):
     positions: List[ConflictPosition] = Field(default_factory=list)
 
 
+class FollowUpQuery(BaseModel):
+    id: str
+    parent_report_id: str
+    target_type: str  # "takeaway" | "section"
+    target_id: str
+    question: str
+    created_at: str
+
+
+class FollowUpResult(BaseModel):
+    follow_up_id: str
+    question: str
+    target_type: str
+    target_id: str
+    new_sources: List[Source] = Field(default_factory=list)
+    summary: str
+    updated_takeaway_or_section: Optional[str] = None
+    merged_into_parent: bool = False
+    created_at: str
+
+
 class ResearchReport(BaseModel):
+    id: Optional[str] = None
     topic: str
     generated_at: str
     key_takeaways: List[KeyTakeaway] = Field(default_factory=list)
@@ -83,4 +105,6 @@ class ResearchReport(BaseModel):
     conflicting_information: List[ConflictingTopic] = Field(default_factory=list)
     confidence_note: Optional[str] = None
     filter_settings: Optional[FilterSettings] = None
+    follow_ups: List[FollowUpResult] = Field(default_factory=list)
+
 
