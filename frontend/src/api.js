@@ -89,4 +89,24 @@ export async function runComparativeResearch(topicA, topicB, depth = "standard",
   return res.json();
 }
 
+export async function continueResearchSession(filename, report, additionalContext, depth = "standard") {
+  const res = await fetch("/api/research/continue", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      filename,
+      report,
+      additional_context: additionalContext || null,
+      depth,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Session continuation failed.");
+  }
+  return res.json();
+}
+
+
 

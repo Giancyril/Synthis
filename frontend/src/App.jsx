@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import "./index.css";
-import { checkHealth, runResearch, fetchReports, fetchReportByFilename, executeFollowUpQuery, runComparativeResearch } from "./api";
+import { checkHealth, runResearch, fetchReports, fetchReportByFilename, executeFollowUpQuery, runComparativeResearch, continueResearchSession } from "./api";
 import { CustomSelectDropdown, CustomDatePicker } from "./components";
 
 const STAGES = [
@@ -124,12 +124,42 @@ export default function App() {
     }));
   }
 
-  function handleDismissFollowUp(fuId) {
-    setReport((prev) => ({
-      ...prev,
-      follow_ups: (prev.follow_ups || []).filter((f) => f.follow_up_id !== fuId),
-    }));
+  const [session, setSession] = useState(null);
+  const [continueTarget, setContinueTarget] = useState(null);
+  const [additionalContextInput, setAdditionalContextInput] = useState("");
+  const [continueLoading, setContinueLoading] = useState(false);
+
+  async function handleExecuteContinue() {
+    if (!continueTarget || continueLoading) return;
+    setContinueLoading(true);
+    setError(null);
+    try {
+      const res = await continueResearchSession(
+        continueTarget.filename,
+        report,
+        additionalContextInput.trim(),
+        depth
+      );
+      if (res.session) {
+        setSession(res.session);
+        setReport({
+          topic: res.session.topic,
+          generated_at: res.session.last_updated_at,
+          key_takeaways: res.session.merged_takeaways,
+          sections: report?.sections || [{ heading: "Full Session Report", content: "Session updated with new pass." }],
+          sources: res.session.merged_sources,
+        });
+      }
+      setContinueTarget(null);
+      setAdditionalContextInput("");
+      setShowDrawer(false);
+    } catch (err) {
+      alert("Session continuation failed: " + err.message);
+    } finally {
+      setContinueLoading(false);
+    }
   }
+
 
   // Stage animation timing adjusts based on depth
   useEffect(() => {
@@ -971,6 +1001,24 @@ export default function App() {
               {/* Overview tab */}
               {activeTab === "overview" && (
                 <>
+                  {/* Session Delta Banner & Timeline */}
+                  {session && session.what_changed_summary && (
+                    <div className="session-delta-banner">
+                      <div className="session-delta-title">
+                        🔄 Multi-Pass Session Update ({session.passes?.length} passes)
+                      </div>
+                      <div className="session-delta-body">{session.what_changed_summary}</div>
+                      <div className="session-timeline">
+                        {session.passes?.map((p, pIdx) => (
+                          <span key={pIdx} className="session-pass-badge">
+                            Pass {pIdx + 1} ({p.depth}) · {p.run_at}
+                            {p.additional_context && ` · "${p.additional_context}"`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {report.confidence_note && (() => {
                     const noteText = report.confidence_note;
                     const isStaleness = noteText.includes("year old") || noteText.includes("dates are unavailable");
@@ -1148,15 +1196,23 @@ export default function App() {
                 </div>
               ) : (
                 historyReports.map((item) => (
-                  <div
-                    key={item.filename}
-                    className="history-item"
-                    onClick={() => handleSelectHistoryReport(item.filename)}
-                  >
-                    <div className="history-name">{item.filename}</div>
-                    <div className="history-meta">
-                      {(item.size_bytes / 1024).toFixed(1)} KB
+                  <div key={item.filename} className="history-item-row">
+                    <div
+                      className="history-item"
+                      style={{ flex: 1 }}
+                      onClick={() => handleSelectHistoryReport(item.filename)}
+                    >
+                      <div className="history-name">{item.filename}</div>
+                      <div className="history-meta">
+                        {(item.size_bytes / 1024).toFixed(1)} KB
+                      </div>
                     </div>
+                    <button
+                      className="history-continue-btn"
+                      onClick={() => setContinueTarget(item)}
+                    >
+                      Continue
+                    </button>
                   </div>
                 ))
               )}
@@ -1164,6 +1220,50 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ── Continuation Modal ── */}
+      {continueTarget && (
+        <div className="drawer-overlay" onClick={() => setContinueTarget(null)}>
+          <div className="continue-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="drawer-header">
+              <div className="drawer-title">Continue Research Pass</div>
+              <button className="close-btn" onClick={() => setContinueTarget(null)}>✕</button>
+            </div>
+            <div style={{ padding: "16px 20px" }}>
+              <div style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 12 }}>
+                Target report: <strong>{continueTarget.filename}</strong>
+              </div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3)", textTransform: "uppercase", display: "block", marginBottom: 6 }}>
+                Optional Refinement Context / Specific Focus
+              </label>
+              <textarea
+                className="search-textarea"
+                placeholder="e.g. 'Focus on new 2026 developments or pricing updates...'"
+                value={additionalContextInput}
+                onChange={(e) => setAdditionalContextInput(e.target.value)}
+                rows={3}
+                style={{ width: "100%", marginBottom: 16 }}
+              />
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button
+                  className="action-btn"
+                  onClick={() => setContinueTarget(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="search-btn"
+                  disabled={continueLoading}
+                  onClick={handleExecuteContinue}
+                >
+                  {continueLoading ? "Running Pass..." : "Start Research Pass"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

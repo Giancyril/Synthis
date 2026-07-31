@@ -1584,3 +1584,74 @@ body {
   margin-top: 4px;
 }
 
+/* ── Save & Merge Sessions CSS ────────────── */
+.session-delta-banner {
+  background: rgba(129, 140, 248, 0.08);
+  border: 1px solid rgba(129, 140, 248, 0.25);
+  border-left: 3px solid var(--brand);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+.session-delta-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand-hi);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+.session-delta-body {
+  font-size: 12.5px;
+  color: var(--text-1);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.session-timeline {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.session-pass-badge {
+  background: var(--surface-3);
+  border: 1px solid var(--border-hi);
+  color: var(--text-2);
+  font-size: 10.5px;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.history-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.history-continue-btn {
+  background: rgba(129, 140, 248, 0.15);
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  color: var(--brand-hi);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.history-continue-btn:hover {
+  background: var(--brand);
+  color: #fff;
+}
+
+.continue-modal-content {
+  background: var(--surface-1);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  margin: auto;
+  position: relative;
+  top: 15%;
+}
+
+
