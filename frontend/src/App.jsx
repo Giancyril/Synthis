@@ -1042,6 +1042,7 @@ export default function App() {
                     <>
                       <div className="label">Key Takeaways</div>
                       <div className="takeaways">
+                        {report.key_takeaways.map((kt, i) => (
                           <div key={i} className="takeaway-item">
                             <div className="takeaway-bullet" />
                             <div style={{ flex: 1 }}>
