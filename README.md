@@ -32,12 +32,18 @@ Server-side retrieval filters applied at query time — not post-processed after
 
 All active filters are echoed back in the UI as summary chips above the generated report.
 
+### Trust & Verification Layer
+- **Domain-Authority Credibility Scoring**: Automatically classifies retrieved sources into qualitative authority tiers (`Primary` for government, academic, standards bodies, and major wire services; `Secondary` for established news and official docs; `Low Authority` for forums and content farms; `Unrated` when unclassified). Displayed as colored badges in citation hover cards and source lists.
+- **Cross-Source Corroboration Indicators**: Computes the exact number of distinct sources supporting each key takeaway and claim. Surfaces explicit visual badges: `Corroborated by N sources` (emerald pill) when supported by 2+ sources, or `Single-sourced` (subtle border pill) when relying on a single source.
+- **Structured Contradiction Detection**: Extracts genuine conflicting facts, dates, timelines, or conclusions between sources into structured `conflicting_information` data. Rendered in a dedicated side-by-side **Conflicting Information** UI card displaying disputed topics with competing claims and supporting source citations.
+- **Source Recency & Staleness Warnings**: Audits source publication dates during citation validation. If the median age of cited sources exceeds 12 months, or if publication dates are unavailable for most sources, a prominent **Source Recency Warning** banner (`.confidence-banner`) is surfaced at the top of the report.
+
 ### Advanced Features
 - **Research Depth Selector**: User-controlled execution modes tailored for different research needs:
   - **Quick Scan**: 2 queries, max 6 sources — ultra-fast initial overview
   - **Standard**: 4 queries, max 12 sources — balanced multi-angled report
   - **Deep Research**: 6 queries, max 20 sources — exhaustive deep dive
-- **Interactive Citation Popovers**: Hovering over any `[S1]`, `[S2]` citation tag in the UI opens a floating glassmorphic popover displaying the source title, domain name, snippet excerpt, and direct web link.
+- **Interactive Citation Popovers**: Hovering over any `[S1]`, `[S2]` citation tag in the UI opens a floating glassmorphic popover displaying the source title, domain name, snippet excerpt, credibility tier badge, and direct web link.
 - **Web Speech Audio Summary Narrator**: Native browser text-to-speech engine (`SpeechSynthesisUtterance`) allowing users to listen to spoken executive summaries of key takeaways with play/stop controls.
 - **Past Reports History Drawer**: Header button opens a slide-out side panel listing all previously generated markdown reports saved on the server, complete with file size and timestamp, offering 1-click report loading.
 - **Dual Export Formats**: Instant 1-click copy to clipboard and `.md` file download, with full CLI support for exporting structured `.json` payloads.
@@ -195,7 +201,7 @@ AI Research Assistant/
 │       ├── __init__.py
 │       ├── markdown_export.py  # Markdown generator
 │       └── json_export.py      # JSON exporter
-├── tests/                      # Automated test suite (16 tests)
+├── tests/                      # Automated test suite (23 tests)
 │   ├── __init__.py
 │   ├── test_citation_mapper.py
 │   ├── test_exports.py
@@ -246,8 +252,8 @@ The FastAPI backend exposes the following REST endpoints:
 - **Source Filtering**: < 5ms for domain deduplication and score filtering
 - **Per-Source Summarization**: ~2.5s for grounded Gemini processing
 - **Report Synthesis**: ~2.8s for executive summary and section breakdown
-- **Citation Audit**: < 10ms for citation verification and index mapping
-- **Test Coverage**: 16 unit & integration tests (15 offline passed, 1 live integration skipped by default)
+- **Citation Audit & Staleness Warning**: < 10ms for citation verification, corroboration mapping, and date recency calculation
+- **Test Coverage**: 23 unit & integration tests (22 offline passed, 1 live integration skipped by default)
 
 ## Features in Detail
 
