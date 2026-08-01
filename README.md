@@ -43,6 +43,12 @@ All active filters are echoed back in the UI as summary chips above the generate
 - **Comparative Research Mode**: A dedicated comparative pipeline for "Topic A vs Topic B" inquiries. Automatically infers 3–6 domain-relevant comparison dimensions, executes dual retrieval passes per topic, synthesizes side-by-side positions with inline `[S#]` citations, and renders a side-by-side comparative table layout.
 - **Save & Merge Sessions**: Multi-pass research sessions for ongoing investigation over time. Automatically deduplicates newly retrieved web sources against prior passes by normalized URL, generates a **"What's New / Changed"** delta summary, and appends new cited takeaways to a unified session timeline.
 
+### Collaboration & Sharing Features
+- **Shareable Read-Only Report Links**: Generate a public/unlisted URL (`/shared/:token`) for any saved report. Viewable without authenticating or re-running research. Revokable at any time with 1 click (`DELETE /api/reports/{id}/share`). Deliberately returns a scoped `PublicReportDTO` excluding internal metadata, session history, and personal notes.
+- **Annotations & Personal Notes**: Leave notes and comments on specific takeaways, sections, or sources. Features inline thread expansion, resolved/unresolved toggling, deletion, and unresolved badge counters (`💬 N open`). Notes stay strictly private to the report owner — never exposed on public shared links.
+- **Team Knowledge Base & Full-Text Search**: Search past research using a high-performance SQLite FTS5 index over topics, key takeaways, section content, and source titles. Results feature BM25 relevance ranking and contextually highlighted search term snippets (`<mark>`).
+
+
 ### Advanced Features
 - **Research Depth Selector**: User-controlled execution modes tailored for different research needs:
   - **Quick Scan**: 2 queries, max 6 sources — ultra-fast initial overview

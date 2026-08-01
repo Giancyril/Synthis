@@ -109,4 +109,87 @@ export async function continueResearchSession(filename, report, additionalContex
 }
 
 
+// ── Sharing (Feature 1) ──────────────────────────────────────────────────────
 
+export async function shareReport(reportId) {
+  const res = await fetch(`/api/reports/${encodeURIComponent(reportId)}/share`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to enable sharing.");
+  }
+  return res.json();
+}
+
+export async function unshareReport(reportId) {
+  const res = await fetch(`/api/reports/${encodeURIComponent(reportId)}/share`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to revoke sharing.");
+  }
+  return res.json();
+}
+
+export async function fetchPublicReport(shareToken) {
+  const res = await fetch(`/api/public/reports/${encodeURIComponent(shareToken)}`);
+  if (!res.ok) {
+    if (res.status === 404) throw new Error("Report not found or sharing has been disabled.");
+    throw new Error("Failed to load shared report.");
+  }
+  return res.json();
+}
+
+// ── Annotations (Feature 2) ──────────────────────────────────────────────────
+
+export async function fetchAnnotations(reportId) {
+  const res = await fetch(`/api/reports/${encodeURIComponent(reportId)}/annotations`);
+  if (!res.ok) throw new Error("Failed to fetch annotations.");
+  return res.json();
+}
+
+export async function createAnnotation(reportId, targetType, targetId, body, author) {
+  const res = await fetch(`/api/reports/${encodeURIComponent(reportId)}/annotations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ target_type: targetType, target_id: String(targetId), body, author: author || null }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to create annotation.");
+  }
+  return res.json();
+}
+
+export async function patchAnnotation(annotationId, patch) {
+  const res = await fetch(`/api/annotations/${encodeURIComponent(annotationId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to update annotation.");
+  }
+  return res.json();
+}
+
+export async function deleteAnnotation(annotationId) {
+  const res = await fetch(`/api/annotations/${encodeURIComponent(annotationId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to delete annotation.");
+  }
+}
+
+// ── Search (Feature 3) ───────────────────────────────────────────────────────
+
+export async function searchReports(query) {
+  const res = await fetch(`/api/reports/search?q=${encodeURIComponent(query)}`);
+  if (!res.ok) throw new Error("Search failed.");
+  return res.json();
+}

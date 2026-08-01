@@ -1,6 +1,21 @@
 import { useState, useEffect, useRef } from "react";
 import "./index.css";
-import { checkHealth, runResearch, fetchReports, fetchReportByFilename, executeFollowUpQuery, runComparativeResearch, continueResearchSession } from "./api";
+import {
+  checkHealth,
+  runResearch,
+  fetchReports,
+  fetchReportByFilename,
+  executeFollowUpQuery,
+  runComparativeResearch,
+  continueResearchSession,
+  shareReport,
+  unshareReport,
+  fetchAnnotations,
+  createAnnotation,
+  patchAnnotation,
+  deleteAnnotation,
+  searchReports,
+} from "./api";
 import { CustomSelectDropdown, CustomDatePicker } from "./components";
 
 const STAGES = [
@@ -160,13 +175,245 @@ export default function App() {
       }
       setContinueTarget(null);
       setAdditionalContextInput("");
-      setShowDrawer(false);
     } catch (err) {
       alert("Session continuation failed: " + err.message);
     } finally {
       setContinueLoading(false);
     }
   }
+
+  // Feature 1: Share Modal States
+  const [shareModalReportId, setShareModalReportId] = useState(null);
+  const [shareModalData, setShareModalData] = useState(null); // { share_token, share_enabled, share_url }
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  async function handleOpenShare(reportId) {
+    if (!reportId) return;
+    setShareModalReportId(reportId);
+    setShareModalData(null);
+    setShareLoading(true);
+    try {
+      // Calling share endpoint acts as get or create
+      const res = await shareReport(reportId);
+      setShareModalData(res);
+    } catch (err) {
+      alert("Failed to load share settings: " + err.message);
+      setShareModalReportId(null);
+    } finally {
+      setShareLoading(false);
+    }
+  }
+
+  async function handleToggleShare() {
+    if (!shareModalReportId || !shareModalData) return;
+    setShareLoading(true);
+    try {
+      if (shareModalData.share_enabled) {
+        const res = await unshareReport(shareModalReportId);
+        setShareModalData((prev) => ({ ...prev, share_enabled: false }));
+      } else {
+        const res = await shareReport(shareModalReportId);
+        setShareModalData(res);
+      }
+      // Refresh history list to update badge
+      fetchReports().then(setHistoryReports).catch(() => {});
+    } catch (err) {
+      alert("Sharing action failed: " + err.message);
+    } finally {
+      setShareLoading(false);
+    }
+  }
+
+  function handleCopyShareUrl() {
+    if (!shareModalData?.share_url) return;
+    navigator.clipboard.writeText(shareModalData.share_url);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
+  }
+
+  // Feature 2: Annotations States
+  const [currentReportId, setCurrentReportId] = useState(null); // e.g. "report_solid_state"
+  const [annotations, setAnnotations] = useState([]);
+  const [activeAnnotationTarget, setActiveAnnotationTarget] = useState(null); // { targetType, targetId }
+  const [newAnnotationBody, setNewAnnotationBody] = useState("");
+  const [annotationLoading, setAnnotationLoading] = useState(false);
+
+  // Load annotations whenever report changes
+  useEffect(() => {
+    if (report?.id || currentReportId) {
+      const repId = report?.id || currentReportId;
+      fetchAnnotations(repId)
+        .then(setAnnotations)
+        .catch(() => setAnnotations([]));
+    } else {
+      setAnnotations([]);
+    }
+  }, [report, currentReportId]);
+
+  async function handleAddAnnotation(targetType, targetId) {
+    if (!newAnnotationBody.trim() || annotationLoading) return;
+    const repId = report?.id || currentReportId || "current_report";
+    setAnnotationLoading(true);
+    try {
+      const ann = await createAnnotation(repId, targetType, String(targetId), newAnnotationBody.trim());
+      setAnnotations((prev) => [...prev, ann]);
+      setNewAnnotationBody("");
+      // Refresh history list for unresolved count badge
+      fetchReports().then(setHistoryReports).catch(() => {});
+    } catch (err) {
+      alert("Failed to add note: " + err.message);
+    } finally {
+      setAnnotationLoading(false);
+    }
+  }
+
+  async function handleToggleResolveAnnotation(annId, currentStatus) {
+    try {
+      const updated = await patchAnnotation(annId, { resolved: !currentStatus });
+      setAnnotations((prev) => prev.map((a) => (a.id === annId ? updated : a)));
+      fetchReports().then(setHistoryReports).catch(() => {});
+    } catch (err) {
+      alert("Failed to update note: " + err.message);
+    }
+  }
+
+  async function handleDeleteAnnotation(annId) {
+    try {
+      await deleteAnnotation(annId);
+      setAnnotations((prev) => prev.filter((a) => a.id !== annId));
+      fetchReports().then(setHistoryReports).catch(() => {});
+    } catch (err) {
+      alert("Failed to delete note: " + err.message);
+    }
+  }
+
+  // Feature 3: Past Reports Drawer FTS Search States
+  const [drawerQuery, setDrawerQuery] = useState("");
+  const [drawerSearchResults, setDrawerSearchResults] = useState(null); // null when not searching
+  const [drawerSearchLoading, setDrawerSearchLoading] = useState(false);
+
+  useEffect(() => {
+    if (!drawerQuery.trim()) {
+      setDrawerSearchResults(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setDrawerSearchLoading(true);
+      try {
+        const results = await searchReports(drawerQuery.trim());
+        setDrawerSearchResults(results);
+      } catch (err) {
+        console.error("FTS search error:", err);
+      } finally {
+        setDrawerSearchLoading(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [drawerQuery]);
+
+  // Feature 2: Annotations UI Renderer
+  function renderAnnotationUI(targetType, targetId) {
+    const matchingNotes = annotations.filter(
+      (a) => a.target_type === targetType && a.target_id === String(targetId)
+    );
+    const isOpen =
+      activeAnnotationTarget?.targetType === targetType &&
+      activeAnnotationTarget?.targetId === String(targetId);
+
+    const noteCount = matchingNotes.length;
+    const unresolvedCount = matchingNotes.filter((a) => !a.resolved).length;
+
+    return (
+      <div style={{ marginTop: 6, display: "inline-block" }}>
+        <button
+          type="button"
+          className={`annotation-trigger-btn${noteCount > 0 ? " has-notes" : ""}`}
+          onClick={() => {
+            if (isOpen) {
+              setActiveAnnotationTarget(null);
+            } else {
+              setActiveAnnotationTarget({ targetType, targetId: String(targetId) });
+              setNewAnnotationBody("");
+            }
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          {noteCount === 0 ? "Add note" : `${noteCount} note${noteCount > 1 ? "s" : ""}`}
+          {unresolvedCount > 0 && (
+            <span className="annotation-badge-unresolved">{unresolvedCount} open</span>
+          )}
+        </button>
+
+        {isOpen && (
+          <div className="annotation-container" style={{ marginTop: 8, maxWidth: 440 }}>
+            <div className="annotation-header">
+              <span>Personal Notes on this {targetType}</span>
+              <button
+                type="button"
+                className="followup-close-btn"
+                onClick={() => setActiveAnnotationTarget(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* List existing notes */}
+            {matchingNotes.map((note) => (
+              <div key={note.id} className={`annotation-item${note.resolved ? " resolved" : ""}`}>
+                <div className="annotation-body">{note.body}</div>
+                <div className="annotation-footer">
+                  <span>{new Date(note.created_at).toLocaleDateString()}</span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={note.resolved}
+                        onChange={() => handleToggleResolveAnnotation(note.id, note.resolved)}
+                      />
+                      {note.resolved ? "Resolved" : "Mark resolved"}
+                    </label>
+                    <button
+                      type="button"
+                      style={{ background: "none", border: "none", color: "var(--rose)", cursor: "pointer", fontSize: 11 }}
+                      onClick={() => handleDeleteAnnotation(note.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* New note input */}
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+              <input
+                type="text"
+                className="followup-input"
+                placeholder="Write a note to self…"
+                value={newAnnotationBody}
+                onChange={(e) => setNewAnnotationBody(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddAnnotation(targetType, targetId);
+                }}
+              />
+              <button
+                type="button"
+                className="followup-submit-btn"
+                disabled={annotationLoading || !newAnnotationBody.trim()}
+                onClick={() => handleAddAnnotation(targetType, targetId)}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
 
 
   // Stage animation timing adjusts based on depth and mode
@@ -962,6 +1209,20 @@ export default function App() {
                 </div>
               </div>
               <div className="report-actions">
+                <button
+                  className="action-btn"
+                  onClick={() => handleOpenShare(report.id || currentReportId || `report_${(report.topic || "topic").slice(0, 20).toLowerCase().replace(/\s+/g, "_")}`)}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                  </svg>
+                  Share
+                </button>
+
                 {/* Audio speech button */}
                 {report.key_takeaways?.length > 0 && (
                   <button className="action-btn" onClick={toggleAudioSummary}>
@@ -1074,7 +1335,10 @@ export default function App() {
                                   <span key={sid} className="source-badge">{sid}</span>
                                 ))}
                               </div>
-                              {renderFollowUpUI("takeaway", i)}
+                              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                                {renderFollowUpUI("takeaway", i)}
+                                {renderAnnotationUI("takeaway", i)}
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -1118,7 +1382,10 @@ export default function App() {
                           <div className="section-content">
                             {renderInteractiveCitations(sec.content)}
                           </div>
-                          {renderFollowUpUI("section", sec.heading)}
+                          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
+                            {renderFollowUpUI("section", sec.heading)}
+                            {renderAnnotationUI("section", sec.heading)}
+                          </div>
                         </div>
                       ))}
                     </>
@@ -1163,6 +1430,9 @@ export default function App() {
                                     : "Unrated"}
                             </span>
                           </div>
+                          <div style={{ marginTop: 6 }}>
+                            {renderAnnotationUI("source", src.id)}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1195,40 +1465,112 @@ export default function App() {
         )}
       </main>
 
-      {/* ── Slide-out History Drawer ── */}
+      {/* ── Slide-out History & Knowledge Base Search Drawer ── */}
       {showDrawer && (
         <div className="drawer-overlay" onClick={() => setShowDrawer(false)}>
           <div className="drawer-content" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header">
-              <div className="drawer-title">Past Research Reports</div>
+              <div className="drawer-title">Team Knowledge Base</div>
               <button className="close-btn" onClick={() => setShowDrawer(false)}>✕</button>
             </div>
+
+            {/* FTS Search Input Bar */}
+            <div className="drawer-search-box">
+              <input
+                type="text"
+                className="drawer-search-input"
+                placeholder="🔍 Search past research (full-text index)..."
+                value={drawerQuery}
+                onChange={(e) => setDrawerQuery(e.target.value)}
+              />
+            </div>
+
             <div className="history-list">
-              {historyReports.length === 0 ? (
-                <div style={{ fontSize: 13, color: "var(--text-3)", textAlign: "center", paddingTop: 40 }}>
-                  No saved reports found on server.
+              {drawerSearchLoading && (
+                <div style={{ fontSize: 12, color: "var(--text-3)", textAlign: "center", padding: 20 }}>
+                  Searching FTS index…
                 </div>
-              ) : (
-                historyReports.map((item) => (
-                  <div key={item.filename} className="history-item-row">
-                    <div
-                      className="history-item"
-                      style={{ flex: 1 }}
-                      onClick={() => handleSelectHistoryReport(item.filename)}
-                    >
-                      <div className="history-name">{item.filename}</div>
-                      <div className="history-meta">
-                        {(item.size_bytes / 1024).toFixed(1)} KB
+              )}
+
+              {/* FTS Search Results Mode */}
+              {drawerSearchResults !== null && !drawerSearchLoading && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3)", textTransform: "uppercase", padding: "8px 16px" }}>
+                    Search Results ({drawerSearchResults.length})
+                  </div>
+                  {drawerSearchResults.length === 0 ? (
+                    <div style={{ fontSize: 13, color: "var(--text-3)", textAlign: "center", paddingTop: 20 }}>
+                      No matching reports found for "{drawerQuery}".
+                    </div>
+                  ) : (
+                    drawerSearchResults.map((res) => (
+                      <div
+                        key={res.report_id}
+                        className="history-item"
+                        style={{ marginBottom: 8, cursor: "pointer" }}
+                        onClick={() => handleSelectHistoryReport(`${res.report_id}.md`)}
+                      >
+                        <div className="history-name">{res.topic}</div>
+                        <div className="history-meta">{res.generated_at}</div>
+                        {res.snippet && (
+                          <div
+                            className="search-snippet"
+                            dangerouslySetInnerHTML={{ __html: res.snippet }}
+                          />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Normal Past Reports List Mode */}
+              {drawerSearchResults === null && !drawerSearchLoading && (
+                historyReports.length === 0 ? (
+                  <div style={{ fontSize: 13, color: "var(--text-3)", textAlign: "center", paddingTop: 40 }}>
+                    No saved reports found on server.
+                  </div>
+                ) : (
+                  historyReports.map((item) => (
+                    <div key={item.filename} className="history-item-row">
+                      <div
+                        className="history-item"
+                        style={{ flex: 1 }}
+                        onClick={() => handleSelectHistoryReport(item.filename)}
+                      >
+                        <div className="history-name" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          {item.filename}
+                          {item.share_enabled && (
+                            <span className="share-badge">Shared</span>
+                          )}
+                          {item.unresolved_annotations > 0 && (
+                            <span className="annotation-badge-unresolved">
+                              💬 {item.unresolved_annotations} open
+                            </span>
+                          )}
+                        </div>
+                        <div className="history-meta">
+                          {(item.size_bytes / 1024).toFixed(1)} KB
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button
+                          className="history-continue-btn"
+                          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid var(--border)" }}
+                          onClick={() => handleOpenShare(item.report_id || item.filename.replace(/\.md$/, ""))}
+                        >
+                          🔗 Share
+                        </button>
+                        <button
+                          className="history-continue-btn"
+                          onClick={() => setContinueTarget(item)}
+                        >
+                          Continue
+                        </button>
                       </div>
                     </div>
-                    <button
-                      className="history-continue-btn"
-                      onClick={() => setContinueTarget(item)}
-                    >
-                      Continue
-                    </button>
-                  </div>
-                ))
+                  ))
+                )
               )}
             </div>
           </div>
@@ -1273,6 +1615,79 @@ export default function App() {
                   {continueLoading ? "Running Pass..." : "Start Research Pass"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Share Report Modal ── */}
+      {shareModalReportId && (
+        <div className="drawer-overlay" onClick={() => setShareModalReportId(null)}>
+          <div className="share-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="drawer-header">
+              <div className="drawer-title">Share Research Report</div>
+              <button className="close-btn" onClick={() => setShareModalReportId(null)}>✕</button>
+            </div>
+            <div style={{ padding: "20px" }}>
+              {shareLoading && !shareModalData ? (
+                <div style={{ textAlign: "center", padding: 20 }}>
+                  <div className="spinner" style={{ margin: "0 auto 12px" }} />
+                  <div style={{ fontSize: 13, color: "var(--text-2)" }}>Loading share link…</div>
+                </div>
+              ) : (
+                <>
+                  <div className="share-toggle-row">
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>
+                        {shareModalData?.share_enabled ? "Sharing is Enabled" : "Report is Private"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+                        {shareModalData?.share_enabled
+                          ? "Anyone with the unlisted link can view this read-only report."
+                          : "Enable to generate a public/unlisted share URL."}
+                      </div>
+                    </div>
+                    <button
+                      className="search-btn"
+                      style={{
+                        padding: "6px 14px",
+                        fontSize: 12,
+                        background: shareModalData?.share_enabled ? "var(--rose)" : "var(--brand)",
+                      }}
+                      disabled={shareLoading}
+                      onClick={handleToggleShare}
+                    >
+                      {shareModalData?.share_enabled ? "Revoke Link" : "Enable Link"}
+                    </button>
+                  </div>
+
+                  {shareModalData?.share_enabled && (
+                    <>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3)", textTransform: "uppercase", display: "block", marginBottom: 6 }}>
+                        Public Unlisted Link
+                      </label>
+                      <div className="share-url-box">
+                        <input
+                          type="text"
+                          readOnly
+                          className="share-url-input"
+                          value={shareModalData.share_url}
+                        />
+                        <button
+                          className="action-btn"
+                          style={{ padding: "4px 10px", fontSize: 11 }}
+                          onClick={handleCopyShareUrl}
+                        >
+                          {shareCopied ? "✓ Copied" : "Copy Link"}
+                        </button>
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text-3)", lineHeight: 1.4 }}>
+                        🔒 <strong>Privacy note:</strong> Personal notes/annotations and follow-up history are NOT included on the public view.
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
