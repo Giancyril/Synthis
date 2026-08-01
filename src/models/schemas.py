@@ -125,6 +125,72 @@ class ResearchReport(BaseModel):
     confidence_note: Optional[str] = None
     filter_settings: Optional[FilterSettings] = None
     follow_ups: List[FollowUpResult] = Field(default_factory=list)
+    # Sharing (Feature 1) — private by default; token generated on demand
+    share_token: Optional[str] = None
+    share_enabled: bool = False
+    share_created_at: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Public DTO — deliberately scoped; never includes internal/private fields
+# ---------------------------------------------------------------------------
+
+class PublicReportDTO(BaseModel):
+    """Read-only view returned by GET /api/public/reports/{share_token}.
+    Excludes: id, share_token, share_enabled, share_created_at,
+              filter_settings, follow_ups, session metadata.
+    """
+    topic: str
+    generated_at: str
+    key_takeaways: List[KeyTakeaway] = Field(default_factory=list)
+    sections: List[ReportSection] = Field(default_factory=list)
+    sources: List[Source] = Field(default_factory=list)
+    conflicting_information: List[ConflictingTopic] = Field(default_factory=list)
+    confidence_note: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Annotations (Feature 2) — single-user personal notes; never public
+# ---------------------------------------------------------------------------
+
+class Annotation(BaseModel):
+    id: str                          # "ann_<8-char hex>"
+    report_id: str                   # filename stem, e.g. "report_ai_tools"
+    target_type: str                 # "takeaway" | "section" | "source"
+    target_id: str                   # index string ("0","1") or source id ("S1")
+    author: Optional[str] = None     # display name; None = anonymous
+    body: str
+    created_at: str                  # ISO-8601
+    updated_at: str                  # ISO-8601
+    resolved: bool = False
+
+
+class AnnotationPatch(BaseModel):
+    body: Optional[str] = None
+    resolved: Optional[bool] = None
+    author: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Search (Feature 3) — full-text search DTOs
+# ---------------------------------------------------------------------------
+
+class ReportIndexEntry(BaseModel):
+    """Denormalised row inserted into reports_fts on report save."""
+    report_id: str
+    topic: str
+    generated_at: str
+    key_takeaways_text: str   # all takeaway texts joined with ' | '
+    sections_text: str        # all headings + content joined
+    source_titles: str        # all source titles joined
+
+
+class SearchResultItem(BaseModel):
+    report_id: str
+    topic: str
+    generated_at: str
+    snippet: str              # ~150-char highlight around matched term
+    rank: float               # FTS5 BM25 score (lower = more relevant)
 
 
 class PassMetadata(BaseModel):
