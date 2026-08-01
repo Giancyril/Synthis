@@ -237,7 +237,17 @@ _db: Optional[DatabaseService] = None
 
 
 def get_db() -> DatabaseService:
+    """Return the module-level singleton DatabaseService.
+    On first call, resolves the path relative to the current working directory
+    so that tests using monkeypatch.chdir() get a fresh, isolated instance.
+    """
     global _db
     if _db is None:
         _db = DatabaseService()
     return _db
+
+
+def reset_db() -> None:
+    """Reset the module-level singleton (for use in tests)."""
+    global _db
+    _db = None

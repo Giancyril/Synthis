@@ -11,6 +11,9 @@ from src.config import Config
 from src.main import run_research_pipeline
 from src.models.schemas import ResearchReport, FilterSettings
 from src.output.markdown_export import render_markdown
+from src.routes.sharing_routes import sharing_router, public_router
+from src.routes.annotation_routes import annotation_router
+from src.routes.search_routes import search_router
 
 logger = logging.getLogger("server")
 
@@ -28,6 +31,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Register routers ──────────────────────────────────────────────────────────
+# sharing_router  : POST/DELETE /api/reports/{id}/share
+# public_router   : GET /api/public/reports/{token}  — separate, no auth path
+# annotation_router: CRUD /api/reports/{id}/annotations, /api/annotations/{id}
+# search_router   : GET /api/reports/search
+app.include_router(sharing_router)
+app.include_router(public_router)
+app.include_router(annotation_router)
+app.include_router(search_router)
 
 
 
@@ -66,6 +79,9 @@ class ReportSummary(BaseModel):
     filepath: str
     size_bytes: int
     modified_at: str
+    report_id: str                    # filename stem, used as key for share/annotations
+    share_enabled: bool = False       # whether this report is currently shared
+    unresolved_annotations: int = 0  # badge count for Past Reports drawer
 
 
 @app.get("/api/health", response_model=HealthResponse, tags=["System"])
@@ -146,19 +162,40 @@ def execute_research(req: ResearchRequest):
 
 @app.get("/api/reports", response_model=List[ReportSummary], tags=["Reports"])
 def list_reports():
+    import json as _json
+    from src.services.database import get_db
+
     out_dir = Path("output")
     if not out_dir.exists():
         return []
 
+    db = get_db()
     reports = []
     for p in out_dir.glob("*.md"):
         stat = p.stat()
+        report_id = p.stem
+
+        # Read share_enabled from JSON sidecar (if it exists)
+        share_enabled = False
+        json_p = p.with_suffix(".json")
+        if json_p.exists():
+            try:
+                data = _json.loads(json_p.read_text(encoding="utf-8"))
+                share_enabled = bool(data.get("share_enabled", False))
+            except Exception:
+                pass
+
+        unresolved = db.count_unresolved_annotations(report_id)
+
         reports.append(
             ReportSummary(
                 filename=p.name,
                 filepath=str(p.resolve()),
                 size_bytes=stat.st_size,
                 modified_at=str(stat.st_mtime),
+                report_id=report_id,
+                share_enabled=share_enabled,
+                unresolved_annotations=unresolved,
             )
         )
     return sorted(reports, key=lambda r: r.modified_at, reverse=True)
