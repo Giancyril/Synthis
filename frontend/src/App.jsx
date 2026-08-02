@@ -107,6 +107,9 @@ export default function App() {
   const [sourceCategory, setSourceCategory] = useState("general");
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
+  // Advanced Feature 2: Report Stats state
+  const [reportStats, setReportStats] = useState(null);
+
   // Advanced feature states
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showDrawer, setShowDrawer] = useState(false);
@@ -582,6 +585,7 @@ export default function App() {
       } else {
         const data = await runResearch(topic.trim(), depth, filterSettings, outputLanguage);
         setReport(data.report);
+        setReportStats(data.stats || null);
         setCompareReport(null);
         setMarkdown(data.markdown || "");
         if (data.possible_duplicate) {
@@ -1348,6 +1352,23 @@ export default function App() {
                     <span className="icon">🌐</span>
                     {(LANGUAGE_OPTIONS.find((l) => l.value === report.output_language)?.label || report.output_language).split(" ")[0]} Prose
                   </span>
+                )}
+
+                {reportStats && (
+                  <>
+                    <span className="filter-summary-chip stat-chip">
+                      <span className="icon">📖</span>
+                      ~{reportStats.reading_time_minutes} min read ({reportStats.word_count} words)
+                    </span>
+                    <span className="filter-summary-chip stat-chip">
+                      <span className="icon">🎓</span>
+                      {reportStats.complexity_label} Complexity
+                    </span>
+                    <span className="filter-summary-chip stat-chip">
+                      <span className="icon">📌</span>
+                      {reportStats.citation_density} cit / 100w
+                    </span>
+                  </>
                 )}
               </div>
             )}

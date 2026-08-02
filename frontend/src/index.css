@@ -207,6 +207,12 @@ body {
   font-weight: 500;
 }
 
+.stat-chip {
+  background: var(--brand-dim);
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  color: var(--brand-hi);
+}
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--surface-4); border-radius: 99px; }

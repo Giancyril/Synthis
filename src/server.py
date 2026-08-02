@@ -181,9 +181,13 @@ def execute_research(req: ResearchRequest):
         except Exception as exc:
             logger.warning(f"Failed to check for similar past report: {exc}")
 
+        from src.output.report_stats import compute_stats
+        stats = compute_stats(report)
+
         return {
             "success": True,
             "report": report.model_dump(),
+            "stats": stats.model_dump(),
             "markdown": md_content,
             "filename": safe_filename,
             "filepath": str(out_path.resolve()),
