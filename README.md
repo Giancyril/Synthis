@@ -427,5 +427,35 @@ The React frontend parses rendered text for `[S#]` tags and wraps them in intera
 ### Web Speech Summary Narrator
 Using the native browser `window.speechSynthesis` API, the user can click **"Listen Summary"** to hear an audio narration of all key takeaways. The interface updates dynamically with play and stop controls.
 
+### Advanced Suite Features
+
+#### 1. Source Credibility Deep-Dive (`credibility_analyzer.py`)
+- **Interactive Trust Breakdown**: Clicking **"🛡️ Trust Breakdown"** on any source opens a deep-dive modal displaying a 0–100 trust score gauge ring, tier classification (`Primary`, `Secondary`, `Low Authority`, `Unrated`), domain age hint, tier reasoning, and bias indicators.
+- **50+ Domain Tier Registry**: Evaluates authority using an expanded list of TLDs (`.gov`, `.edu`, `.mil`, `.int`) and academic/journal domains (`arxiv.org`, `nature.com`, `ieee.org`, `reuters.com`, etc.).
+- **Endpoint**: `GET /api/reports/{report_id}/sources/{source_id}/credibility`
+
+#### 2. Research Reading Time & Complexity Estimator (`report_stats.py`)
+- **Header Metadata Chips**: Calculates word count, estimated reading time (~200 wpm), citation density (citations per 100 words), and vocabulary complexity (`Introductory`, `Intermediate`, `Advanced`).
+- **Rendered inline**: Displayed as animated glassmorphic chips in the report header.
+
+#### 3. Smart Research Outline Generator (`outline_generator.py`)
+- **Fast Pre-Research Scope**: Generates a structured research outline (sections, descriptions, key questions to answer) in ~1s before running the full research pipeline.
+- **"Run Full Research" flow**: Users can preview the outline, adjust settings, and launch full research directly from the outline preview card.
+- **Endpoint**: `POST /api/research/outline`
+
+#### 4. Source Quality Watchdog (`source_watchdog.py`)
+- **Echo-Chamber Risk & Diversity Audits**: Automatically analyzes the source portfolio for domain concentration, primary source ratio, and recency spread.
+- **Source Quality Card**: Collapsible UI card surfacing domain diversity %, primary source %, recency %, echo-chamber risk level (`Low`, `Medium`, `High`), warning alerts, and actionable recommendations.
+
+#### 5. Keyword & Topic Trend Extractor (`keyword_extractor.py`)
+- **TF-IDF Term Extraction**: Mins top 15 non-stop-word keywords and clusters them into 5 emerging theme groups based on frequency and co-occurrence.
+- **Interactive Tag Cloud**: Font-size mapped to TF-IDF weight with source ID tooltips and collapsible theme strength progress bars.
+- **Endpoint**: `GET /api/reports/{report_id}/keywords`
+
+#### 6. Printable Executive Brief Mode (`executive_brief.py`)
+- **Boardroom-Ready One-Pager**: Condenses reports to top 3 takeaways (ranked by corroboration count), highlight metrics/figures, key strategic sections, and analyst notes.
+- **Print Optimization**: Includes `@media print` rules for instant printing or PDF export with 1-click **"🖨️ Print Brief"**.
+- **Endpoint**: `GET /api/reports/{report_id}/brief`
+
 ### Past Reports History Drawer
 Every completed report is persisted as a Markdown file in `output/`. Clicking **"Past Reports"** opens a slide-out drawer fetching the index via `GET /api/reports`. Clicking any past report immediately loads its full content into the viewer.
