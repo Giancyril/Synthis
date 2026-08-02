@@ -327,6 +327,46 @@ def get_bibliography(report_id: str, style: str = "apa"):
 
 
 # ---------------------------------------------------------------------------
+# Source Credibility Deep-Dive Endpoint (Advanced Feature 1)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/reports/{report_id}/sources/{source_id}/credibility", response_model=dict, tags=["Reports"])
+def get_source_credibility(report_id: str, source_id: str):
+    """
+    Returns a detailed CredibilityReport breakdown for a specific source in a report.
+    """
+    import json
+    from src.pipeline.credibility_analyzer import CredibilityAnalyzer
+
+    safe_id = Path(report_id).name
+    json_path = Path("output") / f"{safe_id}.json"
+    if not json_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report '{safe_id}' not found.",
+        )
+
+    try:
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+        report = ResearchReport.model_validate(data)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load report: {exc}",
+        )
+
+    matched_source = next((s for s in report.sources if s.id.lower() == source_id.lower()), None)
+    if not matched_source:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Source ID '{source_id}' not found in report '{safe_id}'.",
+        )
+
+    credibility = CredibilityAnalyzer.analyze_source(matched_source)
+    return {"status": "success", "credibility": credibility.model_dump()}
+
+
+# ---------------------------------------------------------------------------
 # Report diffing endpoint (Output Feature 2)
 # ---------------------------------------------------------------------------
 
