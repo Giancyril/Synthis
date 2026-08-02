@@ -182,12 +182,15 @@ def execute_research(req: ResearchRequest):
             logger.warning(f"Failed to check for similar past report: {exc}")
 
         from src.output.report_stats import compute_stats
+        from src.pipeline.source_watchdog import run_watchdog
         stats = compute_stats(report)
+        quality = run_watchdog(report.sources)
 
         return {
             "success": True,
             "report": report.model_dump(),
             "stats": stats.model_dump(),
+            "source_quality": quality.model_dump(),
             "markdown": md_content,
             "filename": safe_filename,
             "filepath": str(out_path.resolve()),
