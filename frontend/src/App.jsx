@@ -20,6 +20,7 @@ import {
   fetchSourceCredibility,
   fetchResearchOutline,
   fetchReportKeywords,
+  fetchExecutiveBrief,
 } from "./api";
 import { CustomSelectDropdown, CustomDatePicker } from "./components";
 
@@ -449,6 +450,30 @@ export default function App() {
   const handleToggleKeywordsPanel = () => {
     if (!showKeywordsPanel && !keywordsData) handleLoadKeywords();
     setShowKeywordsPanel(v => !v);
+  };
+
+  // Advanced Feature 6: Executive Brief States
+  const [briefData, setBriefData] = useState(null);
+  const [showBriefModal, setShowBriefModal] = useState(false);
+  const [briefLoading, setBriefLoading] = useState(false);
+
+  const handleOpenBrief = async () => {
+    const repId = report?.id || currentReportId || (report?.topic
+      ? `report_${report.topic.slice(0, 20).toLowerCase().replace(/\s+/g, "_")}`
+      : null);
+    if (!repId) return;
+    setBriefLoading(true);
+    setShowBriefModal(true);
+    setBriefData(null);
+    try {
+      const res = await fetchExecutiveBrief(repId);
+      setBriefData(res.brief);
+    } catch (err) {
+      alert("Failed to load executive brief: " + err.message);
+      setShowBriefModal(false);
+    } finally {
+      setBriefLoading(false);
+    }
   };
 
   const handleOpenDiff = async (newId, oldId) => {
@@ -1550,6 +1575,9 @@ export default function App() {
                 <button className={`action-btn${showKeywordsPanel ? " active" : ""}`} onClick={handleToggleKeywordsPanel}>
                   🔑 Keywords
                 </button>
+                <button className="action-btn" onClick={handleOpenBrief}>
+                  📋 Executive Brief
+                </button>
                 <button className="action-btn" onClick={handleDownload}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                   Download
@@ -2327,6 +2355,88 @@ export default function App() {
                         <span key={i} className="bias-tag">{b}</span>
                       ))}
                     </div>
+                  </div>
+                )}
+              </div>
+      {/* ── Executive Brief Modal (Advanced Feature 6) ───────────────────── */}
+      {showBriefModal && (
+        <div className="modal-backdrop" onClick={() => setShowBriefModal(false)}>
+          <div className="modal-card brief-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                📋 Executive Brief — Boardroom Summary
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="search-btn"
+                  style={{ height: 28, fontSize: 11, padding: "0 12px" }}
+                  onClick={() => window.print()}
+                >
+                  🖨️ Print Brief
+                </button>
+                <button type="button" className="followup-close-btn" onClick={() => setShowBriefModal(false)}>✕</button>
+              </div>
+            </div>
+
+            {briefLoading ? (
+              <div style={{ padding: 40, textAlign: "center", color: "var(--text-2)", fontSize: 13 }}>
+                Generating single-page Executive Brief…
+              </div>
+            ) : briefData ? (
+              <div className="brief-modal-body brief-print-zone">
+                <div className="brief-brand-header">
+                  <div className="brief-brand-logo">SYNTHIS RESEARCH INTELLIGENCE</div>
+                  <div className="brief-date">{briefData.generated_at}</div>
+                </div>
+
+                <div className="brief-topic-title">{briefData.topic}</div>
+                <div className="brief-meta-line">
+                  Single-Page Executive Synthesis · {briefData.source_count} Retrieved Web Sources
+                </div>
+
+                {briefData.top_takeaways?.length > 0 && (
+                  <div className="brief-block">
+                    <div className="brief-block-title">Key Core Takeaways</div>
+                    <div className="brief-takeaways-list">
+                      {briefData.top_takeaways.map((kt, i) => (
+                        <div key={i} className="brief-takeaway-item">
+                          <span className="brief-num">{i + 1}</span>
+                          <span>{kt}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {briefData.highlight_stats?.length > 0 && (
+                  <div className="brief-block">
+                    <div className="brief-block-title">Highlight Metrics & Verified Figures</div>
+                    <div className="brief-stats-grid">
+                      {briefData.highlight_stats.map((stat, i) => (
+                        <div key={i} className="brief-stat-chip">
+                          {stat}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {briefData.key_sections?.length > 0 && (
+                  <div className="brief-block">
+                    <div className="brief-block-title">Strategic Insights</div>
+                    {briefData.key_sections.map((sec, i) => (
+                      <div key={i} className="brief-sec-item">
+                        <div className="brief-sec-heading">{sec.heading}</div>
+                        <div className="brief-sec-summary">{sec.summary}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {briefData.confidence_note && (
+                  <div className="brief-conf-note">
+                    ℹ️ <strong>Analyst Note:</strong> {briefData.confidence_note}
                   </div>
                 )}
               </div>

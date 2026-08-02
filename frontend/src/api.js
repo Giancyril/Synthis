@@ -262,6 +262,18 @@ export async function fetchReportKeywords(reportId, topN = 15, nThemes = 5) {
   return res.json(); // { status, keywords, themes }
 }
 
+// ── Printable Executive Brief (Advanced Feature 6) ────────────────────────────
+
+export async function fetchExecutiveBrief(reportId) {
+  const res = await fetch(`/api/reports/${encodeURIComponent(reportId)}/brief`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to fetch executive brief.");
+  }
+  return res.json(); // { status, brief }
+}
+
+
 
 
 

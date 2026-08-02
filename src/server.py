@@ -440,6 +440,39 @@ def get_report_keywords(report_id: str, top_n: int = 15, n_themes: int = 5):
 
 
 # ---------------------------------------------------------------------------
+# Executive Brief Endpoint (Advanced Feature 6)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/reports/{report_id}/brief", response_model=dict, tags=["Reports"])
+def get_executive_brief(report_id: str):
+    """
+    Returns a condensed, boardroom-ready Executive Brief for a report.
+    """
+    import json
+    from src.output.executive_brief import generate_brief
+
+    safe_id = Path(report_id).name
+    json_path = Path("output") / f"{safe_id}.json"
+    if not json_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report '{safe_id}' not found.",
+        )
+
+    try:
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+        report = ResearchReport.model_validate(data)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load report: {exc}",
+        )
+
+    brief = generate_brief(report)
+    return {"status": "success", "brief": brief.model_dump()}
+
+
+# ---------------------------------------------------------------------------
 # Report diffing endpoint (Output Feature 2)
 # ---------------------------------------------------------------------------
 
