@@ -2358,6 +2358,11 @@ export default function App() {
                   </div>
                 )}
               </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       {/* ── Executive Brief Modal (Advanced Feature 6) ───────────────────── */}
       {showBriefModal && (
         <div className="modal-backdrop" onClick={() => setShowBriefModal(false)}>
