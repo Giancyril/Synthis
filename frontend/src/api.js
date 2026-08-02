@@ -4,7 +4,7 @@ export async function checkHealth() {
   return res.json();
 }
 
-export async function runResearch(topic, depth = "standard", filterSettings = {}) {
+export async function runResearch(topic, depth = "standard", filterSettings = {}, outputLanguage = "en") {
   const payload = {
     topic,
     depth,
@@ -14,6 +14,7 @@ export async function runResearch(topic, depth = "standard", filterSettings = {}
     domain_mode: filterSettings.domain_mode || "none",
     domain_list: filterSettings.domain_list || [],
     source_category: filterSettings.source_category || "general",
+    output_language: outputLanguage || "en",
   };
 
   const res = await fetch("/api/research", {
@@ -193,3 +194,30 @@ export async function searchReports(query) {
   if (!res.ok) throw new Error("Search failed.");
   return res.json();
 }
+
+// ── Bibliography Export (Output Feature 1) ───────────────────────────────────
+
+export async function fetchBibliography(reportId, style = "apa") {
+  const res = await fetch(
+    `/api/reports/${encodeURIComponent(reportId)}/bibliography?style=${encodeURIComponent(style)}`
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to fetch bibliography.");
+  }
+  return res.json();
+}
+
+// ── Report Diffing (Output Feature 2) ────────────────────────────────────────
+
+export async function fetchDiff(reportId, againstReportId) {
+  const res = await fetch(
+    `/api/reports/${encodeURIComponent(reportId)}/diff?against=${encodeURIComponent(againstReportId)}`
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to compute report diff.");
+  }
+  return res.json(); // { status, diff }
+}
+

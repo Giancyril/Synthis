@@ -11,6 +11,8 @@ from src.config import Config
 from src.main import run_research_pipeline
 from src.models.schemas import ResearchReport, FilterSettings
 from src.output.markdown_export import render_markdown
+from src.output.citation_formatter import format_bibliography, BibStyle
+from src.output.report_diff import compute_diff, topic_similarity, SimilarReportHint
 from src.routes.sharing_routes import sharing_router, public_router
 from src.routes.annotation_routes import annotation_router
 from src.routes.search_routes import search_router
@@ -55,6 +57,7 @@ class ResearchRequest(BaseModel):
     domain_mode: Optional[str] = "none"
     domain_list: List[str] = Field(default_factory=list)
     source_category: Optional[str] = "general"
+    output_language: Optional[str] = "en"
 
     def get_filter_settings(self) -> FilterSettings:
         return FilterSettings(
@@ -141,9 +144,42 @@ def execute_research(req: ResearchRequest):
             depth=req.depth or "standard",
             filter_settings=filter_settings,
             config=cfg,
+            output_language=req.output_language or "en",
         )
 
         md_content = render_markdown(report)
+
+        # ── Check for similar past report (Feature 2) ────────────────
+        possible_duplicate = None
+        try:
+            import json as _json
+            current_stem = out_path.stem
+            best_sim = 0.0
+            best_match = None
+            out_dir = Path("output")
+
+            for json_file in out_dir.glob("*.json"):
+                if json_file.stem == current_stem:
+                    continue
+                try:
+                    data = _json.loads(json_file.read_text(encoding="utf-8"))
+                    past_topic = data.get("topic", "")
+                    sim = topic_similarity(cleaned_topic, past_topic)
+                    if sim >= 0.5 and sim > best_sim:
+                        best_sim = sim
+                        best_match = {
+                            "report_id": json_file.stem,
+                            "topic": past_topic,
+                            "generated_at": data.get("generated_at", ""),
+                            "similarity": round(sim, 2),
+                        }
+                except Exception:
+                    pass
+
+            if best_match:
+                possible_duplicate = best_match
+        except Exception as exc:
+            logger.warning(f"Failed to check for similar past report: {exc}")
 
         return {
             "success": True,
@@ -151,6 +187,7 @@ def execute_research(req: ResearchRequest):
             "markdown": md_content,
             "filename": safe_filename,
             "filepath": str(out_path.resolve()),
+            "possible_duplicate": possible_duplicate,
         }
     except Exception as exc:
         logger.error(f"Error generating research report: {exc}")
@@ -222,6 +259,126 @@ def get_report_by_filename(filename: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to read report: {str(exc)}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Bibliography export endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/api/reports/{report_id}/bibliography", response_model=dict, tags=["Reports"])
+def get_bibliography(report_id: str, style: str = "apa"):
+    """
+    Return a formatted bibliography (plain text) for the sources in the given
+    report.
+
+    Parameters
+    ----------
+    report_id : str
+        The filename stem of the report (e.g. 'report_ai_tools').
+    style : str
+        One of 'apa', 'mla', 'chicago'. Defaults to 'apa'.
+    """
+    import json
+
+    # Validate style early
+    valid_styles = ("apa", "mla", "chicago")
+    if style.lower() not in valid_styles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid style '{style}'. Choose one of: {', '.join(valid_styles)}.",
+        )
+
+    # Resolve the JSON sidecar
+    safe_id = Path(report_id).name  # prevents path traversal
+    json_path = Path("output") / f"{safe_id}.json"
+    if not json_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No saved report found for report_id '{safe_id}'.",
+        )
+
+    try:
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+        report = ResearchReport.model_validate(data)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load report: {exc}",
+        )
+
+    if not report.sources:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Report has no sources to format.",
+        )
+
+    try:
+        text = format_bibliography(report.sources, style.lower())  # type: ignore[arg-type]
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    return {
+        "report_id": safe_id,
+        "style": style.lower(),
+        "source_count": len(report.sources),
+        "text": text,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Report diffing endpoint (Output Feature 2)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/reports/{report_id}/diff", response_model=dict, tags=["Reports"])
+def get_report_diff(report_id: str, against: str):
+    """
+    Compute a structured diff between report_id (new) and against (old).
+
+    Parameters
+    ----------
+    report_id : str
+        The primary (newer) report filename stem (e.g. 'report_ai_tools_v2').
+    against : str
+        The reference (older) report filename stem (e.g. 'report_ai_tools').
+    """
+    import json
+
+    safe_new = Path(report_id).name
+    safe_old = Path(against).name
+
+    new_path = Path("output") / f"{safe_new}.json"
+    old_path = Path("output") / f"{safe_old}.json"
+
+    if not new_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report '{safe_new}' not found.",
+        )
+    if not old_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Comparison baseline report '{safe_old}' not found.",
+        )
+
+    try:
+        new_data = json.loads(new_path.read_text(encoding="utf-8"))
+        old_data = json.loads(old_path.read_text(encoding="utf-8"))
+        new_report = ResearchReport.model_validate(new_data)
+        old_report = ResearchReport.model_validate(old_data)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load reports for diffing: {exc}",
+        )
+
+    try:
+        diff = compute_diff(old_report, new_report, old_id=safe_old, new_id=safe_new)
+        return {"status": "success", "diff": diff.model_dump()}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Diff computation failed: {exc}",
         )
 
 

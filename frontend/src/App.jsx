@@ -15,6 +15,8 @@ import {
   patchAnnotation,
   deleteAnnotation,
   searchReports,
+  fetchBibliography,
+  fetchDiff,
 } from "./api";
 import { CustomSelectDropdown, CustomDatePicker } from "./components";
 
@@ -67,12 +69,25 @@ const SOURCE_CATEGORY_OPTIONS = [
   { value: "finance", label: "Finance" },
 ];
 
+const LANGUAGE_OPTIONS = [
+  { value: "en", label: "English" },
+  { value: "es", label: "Spanish (Español)" },
+  { value: "fr", label: "French (Français)" },
+  { value: "de", label: "German (Deutsch)" },
+  { value: "ja", label: "Japanese (日本語)" },
+  { value: "zh", label: "Chinese (中文)" },
+  { value: "ar", label: "Arabic (العربية)" },
+  { value: "pt", label: "Portuguese (Português)" },
+  { value: "hi", label: "Hindi (हिन्दी)" },
+];
+
 export default function App() {
   const [topic, setTopic] = useState("");
   const [topicB, setTopicB] = useState("");
   const [compareMode, setCompareMode] = useState(false);
   const [compareReport, setCompareReport] = useState(null);
   const [depth, setDepth] = useState("standard");
+  const [outputLanguage, setOutputLanguage] = useState("en");
   const [loading, setLoading] = useState(false);
   const [stageIdx, setStageIdx] = useState(-1);
   const [report, setReport] = useState(null);
@@ -312,6 +327,69 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [drawerQuery]);
 
+  // Output Feature 1: Bibliography Export States
+  const [showBibPanel, setShowBibPanel] = useState(false);
+  const [bibStyle, setBibStyle] = useState("apa");
+  const [bibText, setBibText] = useState("");
+  const [bibLoading, setBibLoading] = useState(false);
+  const [bibCopied, setBibCopied] = useState(false);
+
+  const handleLoadBibliography = async (styleToUse = bibStyle) => {
+    const repId = report?.id || currentReportId || (report?.topic ? `report_${report.topic.slice(0, 20).toLowerCase().replace(/\s+/g, "_")}` : null);
+    if (!repId) return;
+    setBibLoading(true);
+    try {
+      const data = await fetchBibliography(repId, styleToUse);
+      setBibText(data.text);
+    } catch (err) {
+      setBibText(`Failed to generate bibliography: ${err.message}`);
+    } finally {
+      setBibLoading(false);
+    }
+  };
+
+  const handleToggleBibPanel = () => {
+    if (!showBibPanel) {
+      setShowBibPanel(true);
+      handleLoadBibliography(bibStyle);
+    } else {
+      setShowBibPanel(false);
+    }
+  };
+
+  const handleBibStyleChange = (newStyle) => {
+    setBibStyle(newStyle);
+    handleLoadBibliography(newStyle);
+  };
+
+  const handleCopyBib = () => {
+    if (!bibText) return;
+    navigator.clipboard.writeText(bibText);
+    setBibCopied(true);
+    setTimeout(() => setBibCopied(false), 2000);
+  };
+
+  // Output Feature 2: Report Diffing States
+  const [possibleDuplicateHint, setPossibleDuplicateHint] = useState(null); // { report_id, topic, generated_at, similarity }
+  const [showDiffModal, setShowDiffModal] = useState(false);
+  const [diffData, setDiffData] = useState(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+
+  const handleOpenDiff = async (newId, oldId) => {
+    if (!newId || !oldId) return;
+    setDiffLoading(true);
+    setShowDiffModal(true);
+    try {
+      const res = await fetchDiff(newId, oldId);
+      setDiffData(res.diff);
+    } catch (err) {
+      alert("Failed to compute report diff: " + err.message);
+      setShowDiffModal(false);
+    } finally {
+      setDiffLoading(false);
+    }
+  };
+
   // Feature 2: Annotations UI Renderer
   function renderAnnotationUI(targetType, targetId) {
     const matchingNotes = annotations.filter(
@@ -458,6 +536,7 @@ export default function App() {
     setError(null);
     setReport(null);
     setMarkdown("");
+    setPossibleDuplicateHint(null);
     setLoading(true);
     setActiveTab("overview");
     stopAudio();
@@ -479,10 +558,13 @@ export default function App() {
         setReport(null);
         setMarkdown("");
       } else {
-        const data = await runResearch(topic.trim(), depth, filterSettings);
+        const data = await runResearch(topic.trim(), depth, filterSettings, outputLanguage);
         setReport(data.report);
         setCompareReport(null);
         setMarkdown(data.markdown || "");
+        if (data.possible_duplicate) {
+          setPossibleDuplicateHint(data.possible_duplicate);
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -922,6 +1004,16 @@ export default function App() {
                 ))}
               </div>
 
+              {/* Language selector (Output Feature 3) */}
+              <div style={{ width: 140 }}>
+                <CustomSelectDropdown
+                  value={outputLanguage}
+                  onChange={setOutputLanguage}
+                  options={LANGUAGE_OPTIONS}
+                  disabled={loading}
+                />
+              </div>
+
               {/* Filter Panel Toggle */}
               <button
                 type="button"
@@ -1167,6 +1259,39 @@ export default function App() {
         {/* Report */}
         {report && !loading && (
           <div className="report-card">
+            {/* Similar Report Hint Banner (Output Feature 2) */}
+            {possibleDuplicateHint && (
+              <div className="duplicate-hint-banner">
+                <div className="duplicate-hint-content">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1" />
+                    <rect x="8" y="2" width="13" height="13" rx="2" />
+                  </svg>
+                  <div>
+                    <strong>Similar Past Report Found:</strong> You previously researched <em>"{possibleDuplicateHint.topic}"</em> ({possibleDuplicateHint.generated_at}).
+                  </div>
+                </div>
+                <div className="duplicate-hint-actions">
+                  <button
+                    type="button"
+                    className="duplicate-diff-btn"
+                    onClick={() => handleOpenDiff(
+                      report.id || `report_${(report.topic || "topic").slice(0, 20).toLowerCase().replace(/\s+/g, "_")}`,
+                      possibleDuplicateHint.report_id
+                    )}
+                  >
+                    View What Changed ↗
+                  </button>
+                  <button
+                    type="button"
+                    className="duplicate-dismiss-btn"
+                    onClick={() => setPossibleDuplicateHint(null)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Filter Summary Chips */}
             {report.filter_settings && (
               <div className="filter-summary-row" style={{ padding: "14px 24px 0" }}>
@@ -1193,6 +1318,13 @@ export default function App() {
                   <span className="filter-summary-chip">
                     <span className="icon">📰</span>
                     {report.filter_settings.source_category.toUpperCase()} scope
+                  </span>
+                )}
+
+                {report.output_language && report.output_language !== "en" && (
+                  <span className="filter-summary-chip">
+                    <span className="icon">🌐</span>
+                    {(LANGUAGE_OPTIONS.find((l) => l.value === report.output_language)?.label || report.output_language).split(" ")[0]} Prose
                   </span>
                 )}
               </div>
@@ -1250,12 +1382,76 @@ export default function App() {
                     <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg> Copy MD</>
                   )}
                 </button>
+                <button className={`action-btn${showBibPanel ? " active" : ""}`} onClick={handleToggleBibPanel}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  </svg>
+                  Citations
+                </button>
                 <button className="action-btn" onClick={handleDownload}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                   Download
                 </button>
               </div>
             </div>
+
+            {/* Bibliography Panel (Output Feature 1) */}
+            {showBibPanel && (
+              <div className="bibliography-panel">
+                <div className="bibliography-header">
+                  <div className="bibliography-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                    </svg>
+                    Export Bibliography & Citations
+                  </div>
+                  <div className="bib-style-selector">
+                    {[
+                      { id: "apa", label: "APA 7th" },
+                      { id: "mla", label: "MLA 9th" },
+                      { id: "chicago", label: "Chicago" },
+                    ].map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className={`bib-style-btn${bibStyle === s.id ? " active" : ""}`}
+                        onClick={() => handleBibStyleChange(s.id)}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" className="followup-close-btn" onClick={() => setShowBibPanel(false)}>
+                    ✕
+                  </button>
+                </div>
+
+                {bibLoading ? (
+                  <div className="bib-loading">Formatting citations…</div>
+                ) : (
+                  <>
+                    <textarea
+                      className="bib-textarea"
+                      readOnly
+                      value={bibText}
+                      rows={Math.min(10, Math.max(4, (bibText || "").split("\n").length))}
+                    />
+                    <div className="bib-footer">
+                      <span className="bib-hint">Auto-formatted in {bibStyle.toUpperCase()} style · Sorted alphabetically</span>
+                      <button
+                        type="button"
+                        className={`action-btn${bibCopied ? " success" : ""}`}
+                        onClick={handleCopyBib}
+                      >
+                        {bibCopied ? "✓ Copied to Clipboard" : "Copy Bibliography"}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Tabs */}
             <div className="tabs">
@@ -1689,6 +1885,117 @@ export default function App() {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Report Diff Modal (Output Feature 2) ────────────────────────── */}
+      {showDiffModal && (
+        <div className="modal-backdrop" onClick={() => setShowDiffModal(false)}>
+          <div className="modal-card diff-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1" />
+                  <rect x="8" y="2" width="13" height="13" rx="2" />
+                </svg>
+                Report Comparison & Diff
+              </div>
+              <button type="button" className="followup-close-btn" onClick={() => setShowDiffModal(false)}>✕</button>
+            </div>
+
+            {diffLoading ? (
+              <div style={{ padding: 40, textAlign: "center", color: "var(--text-2)", fontSize: 13 }}>
+                Computing changes against prior report…
+              </div>
+            ) : diffData ? (
+              <div className="diff-modal-body">
+                <div className="diff-meta-bar">
+                  <span><strong>Current:</strong> {diffData.new_topic}</span>
+                  <span>vs</span>
+                  <span><strong>Baseline:</strong> {diffData.old_topic}</span>
+                  <span className="diff-sim-badge">Topic Match: {Math.round(diffData.topic_similarity * 100)}%</span>
+                </div>
+
+                {/* 1. Contradicted / Changed Findings (ROSE / RED - Most Prominent) */}
+                {diffData.contradicted_takeaways?.length > 0 && (
+                  <div className="diff-section contradicted">
+                    <div className="diff-section-header rose">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                      Potentially Contradicted or Shifted Findings ({diffData.contradicted_takeaways.length})
+                    </div>
+                    <div className="diff-items-list">
+                      {diffData.contradicted_takeaways.map((item, idx) => (
+                        <div key={idx} className="diff-item contradicted-card">
+                          <div className="diff-item-text">{item.text}</div>
+                          {item.note && <div className="diff-item-note">{item.note}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. New Takeaways */}
+                {diffData.new_takeaways?.length > 0 && (
+                  <div className="diff-section">
+                    <div className="diff-section-header brand">
+                      ✦ Newly Discovered Takeaways ({diffData.new_takeaways.length})
+                    </div>
+                    <div className="diff-items-list">
+                      {diffData.new_takeaways.map((item, idx) => (
+                        <div key={idx} className="diff-item new-card">
+                          <div className="diff-item-text">{item.text}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. New Sources */}
+                {diffData.new_sources?.length > 0 && (
+                  <div className="diff-section">
+                    <div className="diff-section-header emerald">
+                      🌐 Newly Discovered Web Sources ({diffData.new_sources.length})
+                    </div>
+                    <div className="diff-sources-grid">
+                      {diffData.new_sources.map((src) => (
+                        <div key={src.id} className="diff-source-chip new">
+                          <span className="source-title">{src.title}</span>
+                          <a className="source-url" href={src.url} target="_blank" rel="noopener noreferrer">{src.url}</a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Stale / Unretrieved Sources */}
+                {diffData.stale_sources?.length > 0 && (
+                  <div className="diff-section">
+                    <div className="diff-section-header muted">
+                      💤 Sources from Baseline Not Retrieved in New Run ({diffData.stale_sources.length})
+                    </div>
+                    <div className="diff-sources-grid">
+                      {diffData.stale_sources.map((src) => (
+                        <div key={src.id} className="diff-source-chip stale">
+                          <span className="source-title">{src.title}</span>
+                          <span className="source-url">{src.url}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {diffData.new_takeaways?.length === 0 && diffData.contradicted_takeaways?.length === 0 && (
+                  <div className="diff-empty-state">
+                    Both reports yielded identical core takeaways and source coverage.
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
       )}

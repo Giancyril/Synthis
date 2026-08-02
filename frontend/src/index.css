@@ -1818,5 +1818,271 @@ body {
   border-radius: 2px;
 }
 
+/* ── Bibliography Export Panel (Output Feature 1) ───── */
+.bibliography-panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-md);
+  margin: 16px 24px;
+  padding: 16px 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+.bibliography-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.bibliography-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.bib-style-selector {
+  display: flex;
+  gap: 4px;
+  background: var(--bg);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.bib-style-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.bib-style-btn.active {
+  background: var(--brand-dim);
+  color: var(--brand-hi);
+  font-weight: 600;
+}
+.bib-style-btn:hover:not(.active) {
+  color: var(--text-1);
+}
+.bib-textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-1);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 12px 14px;
+  resize: vertical;
+  outline: none;
+}
+.bib-textarea:focus {
+  border-color: var(--brand);
+}
+.bib-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+.bib-hint {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.bib-loading {
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 20px 0;
+  text-align: center;
+}
+
+/* ── Report Diffing UI (Output Feature 2) ───────────── */
+.duplicate-hint-banner {
+  background: var(--brand-dim);
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  border-radius: var(--radius-md);
+  margin: 16px 24px 0;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+.duplicate-hint-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--text-1);
+}
+.duplicate-hint-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.duplicate-diff-btn {
+  background: var(--brand);
+  color: #000;
+  font-weight: 600;
+  font-size: 11.5px;
+  border: none;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.duplicate-diff-btn:hover {
+  opacity: 0.9;
+}
+.duplicate-dismiss-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.duplicate-dismiss-btn:hover {
+  color: var(--text-1);
+}
+
+.diff-modal-card {
+  max-width: 680px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.diff-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.diff-meta-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--bg);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.diff-sim-badge {
+  margin-left: auto;
+  background: var(--surface-3);
+  color: var(--brand-hi);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.diff-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.diff-section.contradicted {
+  background: rgba(251, 113, 133, 0.08);
+  border: 1px solid rgba(251, 113, 133, 0.25);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+.diff-section-header {
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.diff-section-header.rose { color: var(--rose); }
+.diff-section-header.brand { color: var(--brand); }
+.diff-section-header.emerald { color: var(--emerald); }
+.diff-section-header.muted { color: var(--text-3); }
+
+.diff-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.diff-item {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.diff-item.contradicted-card {
+  border-left: 3px solid var(--rose);
+  background: var(--surface-1);
+}
+.diff-item.new-card {
+  border-left: 3px solid var(--brand);
+}
+.diff-item-text {
+  font-size: 12.5px;
+  color: var(--text-1);
+  line-height: 1.5;
+}
+.diff-item-note {
+  font-size: 11px;
+  color: var(--rose);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.diff-sources-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.diff-source-chip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.diff-source-chip.new {
+  border-left: 3px solid var(--emerald);
+}
+.diff-source-chip.stale {
+  border-left: 3px solid var(--surface-4);
+  opacity: 0.7;
+}
+.diff-source-chip .source-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+.diff-source-chip .source-url {
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diff-empty-state {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 30px 0;
+}
+
+
+
 
 
