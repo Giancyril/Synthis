@@ -112,6 +112,10 @@ export default function App() {
   // Advanced Feature 2: Report Stats state
   const [reportStats, setReportStats] = useState(null);
 
+  // Advanced Feature 4: Source Quality Watchdog state
+  const [sourceQuality, setSourceQuality] = useState(null);
+  const [showQualityCard, setShowQualityCard] = useState(false);
+
   // Advanced feature states
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showDrawer, setShowDrawer] = useState(false);
@@ -606,6 +610,7 @@ export default function App() {
         const data = await runResearch(topic.trim(), depth, filterSettings, outputLanguage);
         setReport(data.report);
         setReportStats(data.stats || null);
+        setSourceQuality(data.source_quality || null);
         setCompareReport(null);
         setMarkdown(data.markdown || "");
         if (data.possible_duplicate) {
@@ -1632,6 +1637,55 @@ export default function App() {
                       </div>
                     );
                   })()}
+
+                  {/* Source Quality Watchdog Card (Advanced Feature 4) */}
+                  {sourceQuality && (
+                    <div className={`quality-watchdog-card echo-${sourceQuality.echo_chamber_risk.toLowerCase()}`}>
+                      <div className="quality-watchdog-header" onClick={() => setShowQualityCard(v => !v)} style={{ cursor: "pointer" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                          </svg>
+                          <span className="quality-watchdog-title">Source Quality Report</span>
+                          <span className={`echo-risk-badge echo-${sourceQuality.echo_chamber_risk.toLowerCase()}`}>
+                            {sourceQuality.echo_chamber_risk} Echo-Chamber Risk
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                          <div className="quality-metric-pill">
+                            🌐 Diversity: <strong>{sourceQuality.domain_diversity_score}%</strong>
+                          </div>
+                          <div className="quality-metric-pill">
+                            🏛️ Primary: <strong>{Math.round(sourceQuality.primary_source_ratio * 100)}%</strong>
+                          </div>
+                          <div className="quality-metric-pill">
+                            📅 Recency: <strong>{sourceQuality.recency_score}%</strong>
+                          </div>
+                          <span className="quality-toggle-icon">{showQualityCard ? "▲" : "▼"}</span>
+                        </div>
+                      </div>
+                      {showQualityCard && (
+                        <div className="quality-watchdog-body">
+                          {sourceQuality.warnings?.length > 0 && (
+                            <div className="quality-section">
+                              <div className="quality-section-label warning">⚠️ Warnings</div>
+                              {sourceQuality.warnings.map((w, i) => (
+                                <div key={i} className="quality-warning-item">{w}</div>
+                              ))}
+                            </div>
+                          )}
+                          {sourceQuality.recommendations?.length > 0 && (
+                            <div className="quality-section">
+                              <div className="quality-section-label">💡 Recommendations</div>
+                              {sourceQuality.recommendations.map((r, i) => (
+                                <div key={i} className="quality-rec-item">{r}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Key takeaways */}
                   {report.key_takeaways?.length > 0 && (

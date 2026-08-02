@@ -2364,9 +2364,87 @@ body {
   font-size: 12px;
   color: var(--text-3);
   padding: 30px 0;
+}/* ── Source Quality Watchdog Card (Advanced Feature 4) ────────────── */
+.quality-watchdog-card {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-hi);
+  background: var(--surface-2);
+  margin: 16px 0;
+  overflow: hidden;
 }
+.quality-watchdog-card.echo-low  { border-color: rgba(52, 211, 153, 0.3); }
+.quality-watchdog-card.echo-medium { border-color: rgba(251, 191, 36, 0.3); }
+.quality-watchdog-card.echo-high { border-color: rgba(251, 113, 133, 0.4); }
 
+.quality-watchdog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  gap: 8px;
+  flex-wrap: wrap;
+  user-select: none;
+}
+.quality-watchdog-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.echo-risk-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+.echo-risk-badge.echo-low  { background: rgba(52,211,153,.15); color: var(--emerald); }
+.echo-risk-badge.echo-medium { background: rgba(251,191,36,.15); color: var(--amber); }
+.echo-risk-badge.echo-high { background: rgba(251,113,133,.15); color: var(--rose); }
 
-
+.quality-metric-pill {
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--surface-3);
+  padding: 3px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.quality-toggle-icon {
+  font-size: 10px;
+  color: var(--text-3);
+}
+.quality-watchdog-body {
+  border-top: 1px solid var(--border);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.quality-section { display: flex; flex-direction: column; gap: 6px; }
+.quality-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-3);
+}
+.quality-section-label.warning { color: var(--amber); }
+.quality-warning-item {
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 6px 10px;
+  background: rgba(251,191,36,.07);
+  border: 1px solid rgba(251,191,36,.2);
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+}
+.quality-rec-item {
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 6px 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+}
 
 
