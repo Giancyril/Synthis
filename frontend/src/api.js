@@ -221,3 +221,17 @@ export async function fetchDiff(reportId, againstReportId) {
   return res.json(); // { status, diff }
 }
 
+// ── Source Credibility (Advanced Feature 1) ───────────────────────────────────
+
+export async function fetchSourceCredibility(reportId, sourceId) {
+  const res = await fetch(
+    `/api/reports/${encodeURIComponent(reportId)}/sources/${encodeURIComponent(sourceId)}/credibility`
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to fetch source credibility.");
+  }
+  return res.json();
+}
+
+

@@ -375,6 +375,28 @@ export default function App() {
   const [diffData, setDiffData] = useState(null);
   const [diffLoading, setDiffLoading] = useState(false);
 
+  // Advanced Feature 1: Credibility Deep-Dive States
+  const [credibilityModalSource, setCredibilityModalSource] = useState(null);
+  const [credibilityData, setCredibilityData] = useState(null);
+  const [credibilityLoading, setCredibilityLoading] = useState(false);
+
+  const handleOpenCredibility = async (sourceId) => {
+    const repId = report?.id || currentReportId || (report?.topic ? `report_${report.topic.slice(0, 20).toLowerCase().replace(/\s+/g, "_")}` : null);
+    if (!repId || !sourceId) return;
+    setCredibilityModalSource(sourceId);
+    setCredibilityLoading(true);
+    setCredibilityData(null);
+    try {
+      const res = await fetchSourceCredibility(repId, sourceId);
+      setCredibilityData(res.credibility);
+    } catch (err) {
+      alert("Failed to load credibility details: " + err.message);
+      setCredibilityModalSource(null);
+    } finally {
+      setCredibilityLoading(false);
+    }
+  };
+
   const handleOpenDiff = async (newId, oldId) => {
     if (!newId || !oldId) return;
     setDiffLoading(true);
@@ -1626,7 +1648,14 @@ export default function App() {
                                     : "Unrated"}
                             </span>
                           </div>
-                          <div style={{ marginTop: 6 }}>
+                          <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              className="credibility-deepdive-btn"
+                              onClick={() => handleOpenCredibility(src.id)}
+                            >
+                              🛡️ Trust Breakdown
+                            </button>
                             {renderAnnotationUI("source", src.id)}
                           </div>
                         </div>
@@ -1999,7 +2028,70 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ── Source Credibility Deep-Dive Modal (Advanced Feature 1) ─────── */}
+      {credibilityModalSource && (
+        <div className="modal-backdrop" onClick={() => setCredibilityModalSource(null)}>
+          <div className="modal-card credibility-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                Source Credibility & Trust Deep-Dive [{credibilityModalSource}]
+              </div>
+              <button type="button" className="followup-close-btn" onClick={() => setCredibilityModalSource(null)}>✕</button>
+            </div>
+
+            {credibilityLoading ? (
+              <div style={{ padding: 40, textAlign: "center", color: "var(--text-2)", fontSize: 13 }}>
+                Analyzing source trust score, tier heuristics, and bias indicators…
+              </div>
+            ) : credibilityData ? (
+              <div className="credibility-modal-body">
+                <div className="credibility-score-card">
+                  <div className="credibility-gauge-wrapper">
+                    <div className={`credibility-gauge-ring score-${Math.floor(credibilityData.trust_score / 20)}`}>
+                      <span className="gauge-score-value">{credibilityData.trust_score}</span>
+                      <span className="gauge-score-label">/ 100</span>
+                    </div>
+                  </div>
+                  <div className="credibility-score-info">
+                    <div className="credibility-score-title">
+                      Trust & Authority Index
+                    </div>
+                    <div className="credibility-tier-row">
+                      <span className={`tier-badge ${credibilityData.credibility_tier}`}>
+                        {credibilityData.credibility_tier.toUpperCase()} TIER
+                      </span>
+                      <span className="domain-age-badge">{credibilityData.domain_age_hint}</span>
+                    </div>
+                    <div className="credibility-url">{credibilityData.url}</div>
+                  </div>
+                </div>
+
+                <div className="credibility-detail-section">
+                  <div className="credibility-section-label">Tier Evaluation Rationale</div>
+                  <div className="credibility-text-box">{credibilityData.tier_reason}</div>
+                </div>
+
+                {credibilityData.bias_indicators?.length > 0 && (
+                  <div className="credibility-detail-section">
+                    <div className="credibility-section-label rose">⚠️ Risk & Bias Indicators</div>
+                    <div className="bias-tags">
+                      {credibilityData.bias_indicators.map((b, i) => (
+                        <span key={i} className="bias-tag">{b}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
