@@ -2447,4 +2447,58 @@ body {
   line-height: 1.4;
 }
 
-
+/* ── Keyword & Themes Panel (Advanced Feature 5) ────────────────── */
+.keywords-panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.keywords-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.keywords-panel-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
+.keyword-cloud {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  padding: 16px 20px; align-items: center;
+}
+.keyword-tag {
+  font-weight: 600; color: var(--brand-hi); cursor: default;
+  transition: opacity .15s; line-height: 1.2; letter-spacing: -.2px;
+}
+.keyword-tag:hover { opacity: 1 !important; }
+.themes-list {
+  border-top: 1px solid var(--border);
+  padding: 14px 18px; display: flex; flex-direction: column; gap: 8px;
+}
+.themes-list-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-3); margin-bottom: 4px;
+}
+.theme-cluster { border: none; background: none; }
+.theme-cluster-summary {
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer; list-style: none; padding: 6px 0;
+}
+.theme-cluster-summary::-webkit-details-marker { display: none; }
+.theme-name { font-size: 13px; font-weight: 600; color: var(--text-1); min-width: 110px; }
+.theme-strength-bar {
+  flex: 1; height: 4px; background: var(--surface-4);
+  border-radius: 99px; overflow: hidden;
+}
+.theme-strength-bar > span {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--brand), var(--brand-hi));
+  border-radius: 99px;
+}
+.theme-strength-val { font-size: 11px; color: var(--text-3); min-width: 32px; text-align: right; }
+.theme-kw-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 4px 2px; }
+.theme-kw-chip {
+  background: var(--surface-3); border: 1px solid var(--border);
+  color: var(--text-2); font-size: 11px; padding: 2px 8px; border-radius: 99px;
+}

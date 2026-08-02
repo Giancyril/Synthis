@@ -19,6 +19,7 @@ import {
   fetchDiff,
   fetchSourceCredibility,
   fetchResearchOutline,
+  fetchReportKeywords,
 } from "./api";
 import { CustomSelectDropdown, CustomDatePicker } from "./components";
 
@@ -115,6 +116,11 @@ export default function App() {
   // Advanced Feature 4: Source Quality Watchdog state
   const [sourceQuality, setSourceQuality] = useState(null);
   const [showQualityCard, setShowQualityCard] = useState(false);
+
+  // Advanced Feature 5: Keyword & Theme Extractor state
+  const [keywordsData, setKeywordsData] = useState(null);   // { keywords, themes }
+  const [keywordsLoading, setKeywordsLoading] = useState(false);
+  const [showKeywordsPanel, setShowKeywordsPanel] = useState(false);
 
   // Advanced feature states
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -422,6 +428,27 @@ export default function App() {
     } finally {
       setOutlineLoading(false);
     }
+  };
+
+  const handleLoadKeywords = async () => {
+    const repId = report?.id || currentReportId || (report?.topic
+      ? `report_${report.topic.slice(0, 20).toLowerCase().replace(/\s+/g, "_")}`
+      : null);
+    if (!repId) return;
+    setKeywordsLoading(true);
+    try {
+      const res = await fetchReportKeywords(repId);
+      setKeywordsData(res);
+    } catch (err) {
+      alert("Failed to load keywords: " + err.message);
+    } finally {
+      setKeywordsLoading(false);
+    }
+  };
+
+  const handleToggleKeywordsPanel = () => {
+    if (!showKeywordsPanel && !keywordsData) handleLoadKeywords();
+    setShowKeywordsPanel(v => !v);
   };
 
   const handleOpenDiff = async (newId, oldId) => {
@@ -1520,12 +1547,71 @@ export default function App() {
                   </svg>
                   Citations
                 </button>
+                <button className={`action-btn${showKeywordsPanel ? " active" : ""}`} onClick={handleToggleKeywordsPanel}>
+                  🔑 Keywords
+                </button>
                 <button className="action-btn" onClick={handleDownload}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                   Download
                 </button>
               </div>
             </div>
+
+            {/* Keywords & Themes Panel (Advanced Feature 5) */}
+            {showKeywordsPanel && (
+              <div className="keywords-panel">
+                <div className="keywords-panel-header">
+                  <div className="keywords-panel-title">🔑 Keywords & Emerging Themes</div>
+                  <button type="button" className="followup-close-btn" onClick={() => setShowKeywordsPanel(false)}>✕</button>
+                </div>
+                {keywordsLoading ? (
+                  <div style={{ padding: 24, textAlign: "center", color: "var(--text-2)", fontSize: 13 }}>
+                    Extracting keywords and clustering themes…
+                  </div>
+                ) : keywordsData ? (
+                  <>
+                    {/* Weighted tag cloud */}
+                    <div className="keyword-cloud">
+                      {keywordsData.keywords?.map((kw) => (
+                        <span
+                          key={kw.keyword}
+                          className="keyword-tag"
+                          style={{
+                            fontSize: `${10 + kw.weight * 10}px`,
+                            opacity: 0.5 + kw.weight * 0.5,
+                          }}
+                          title={`Frequency: ${kw.frequency} · Sources: ${kw.source_ids.join(", ") || "n/a"}`}
+                        >
+                          {kw.keyword}
+                        </span>
+                      ))}
+                    </div>
+                    {/* Theme clusters */}
+                    {keywordsData.themes?.length > 0 && (
+                      <div className="themes-list">
+                        <div className="themes-list-label">Emerging Theme Clusters</div>
+                        {keywordsData.themes.map((theme, i) => (
+                          <details key={i} className="theme-cluster">
+                            <summary className="theme-cluster-summary">
+                              <span className="theme-name">{theme.theme}</span>
+                              <span className="theme-strength-bar">
+                                <span style={{ width: `${theme.strength * 100}%` }} />
+                              </span>
+                              <span className="theme-strength-val">{Math.round(theme.strength * 100)}%</span>
+                            </summary>
+                            <div className="theme-kw-list">
+                              {theme.keywords.map((kw) => (
+                                <span key={kw} className="theme-kw-chip">{kw}</span>
+                              ))}
+                            </div>
+                          </details>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : null}
+              </div>
+            )}
 
             {/* Bibliography Panel (Output Feature 1) */}
             {showBibPanel && (

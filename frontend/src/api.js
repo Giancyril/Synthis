@@ -249,5 +249,19 @@ export async function fetchResearchOutline(topic, depth = "standard") {
   return res.json(); // { status, outline }
 }
 
+// ── Keyword & Topic Extractor (Advanced Feature 5) ────────────────────────────
+
+export async function fetchReportKeywords(reportId, topN = 15, nThemes = 5) {
+  const res = await fetch(
+    `/api/reports/${encodeURIComponent(reportId)}/keywords?top_n=${topN}&n_themes=${nThemes}`
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to fetch keywords.");
+  }
+  return res.json(); // { status, keywords, themes }
+}
+
+
 
 
