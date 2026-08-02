@@ -234,4 +234,20 @@ export async function fetchSourceCredibility(reportId, sourceId) {
   return res.json();
 }
 
+// ── Outline Generator (Advanced Feature 3) ────────────────────────────────────
+
+export async function fetchResearchOutline(topic, depth = "standard") {
+  const res = await fetch("/api/research/outline", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic, depth }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to generate research outline.");
+  }
+  return res.json(); // { status, outline }
+}
+
+
 

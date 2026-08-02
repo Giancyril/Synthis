@@ -17,6 +17,8 @@ import {
   searchReports,
   fetchBibliography,
   fetchDiff,
+  fetchSourceCredibility,
+  fetchResearchOutline,
 } from "./api";
 import { CustomSelectDropdown, CustomDatePicker } from "./components";
 
@@ -397,6 +399,24 @@ export default function App() {
       setCredibilityModalSource(null);
     } finally {
       setCredibilityLoading(false);
+    }
+  };
+
+  // Advanced Feature 3: Smart Outline Generator States
+  const [outlineData, setOutlineData] = useState(null);
+  const [outlineLoading, setOutlineLoading] = useState(false);
+
+  const handleGenerateOutline = async () => {
+    if (!topic.trim() || outlineLoading) return;
+    setOutlineLoading(true);
+    setOutlineData(null);
+    try {
+      const res = await fetchResearchOutline(topic.trim(), depth);
+      setOutlineData(res.outline);
+    } catch (err) {
+      alert("Failed to generate outline: " + err.message);
+    } finally {
+      setOutlineLoading(false);
     }
   };
 
@@ -1002,13 +1022,29 @@ export default function App() {
                 disabled={loading}
               />
             )}
-            <button className="search-btn" type="submit" disabled={!topic.trim() || loading}>
-              {loading ? (
-                <><div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Researching…</>
-              ) : (
-                <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg> Research</>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {!compareMode && (
+                <button
+                  type="button"
+                  className="outline-btn"
+                  onClick={handleGenerateOutline}
+                  disabled={!topic.trim() || outlineLoading || loading}
+                >
+                  {outlineLoading ? (
+                    <><div className="spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} /> Planning…</>
+                  ) : (
+                    "📋 Outline"
+                  )}
+                </button>
               )}
-            </button>
+              <button className="search-btn" type="submit" disabled={!topic.trim() || loading}>
+                {loading ? (
+                  <><div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Researching…</>
+                ) : (
+                  <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg> Research</>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="search-footer">
@@ -1163,6 +1199,53 @@ export default function App() {
 
       {/* ── Main Content ── */}
       <main className="main">
+        {/* Research Outline Preview Card (Advanced Feature 3) */}
+        {outlineData && !loading && !report && (
+          <div className="outline-preview-card">
+            <div className="outline-header">
+              <div>
+                <div className="outline-title">📋 Pre-Research Scope & Outline</div>
+                <div className="outline-subtitle">
+                  Topic: <strong>{outlineData.topic}</strong> · Estimated ~{outlineData.estimated_source_count} sources across {outlineData.sections?.length} key angles
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="search-btn"
+                  style={{ height: 32, fontSize: 12, padding: "0 14px" }}
+                  onClick={handleSubmit}
+                >
+                  🚀 Run Full Research Report
+                </button>
+                <button
+                  type="button"
+                  className="followup-close-btn"
+                  onClick={() => setOutlineData(null)}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="outline-sections-grid">
+              {outlineData.sections?.map((sec, i) => (
+                <div key={i} className="outline-section-card">
+                  <div className="outline-sec-heading">{i + 1}. {sec.heading}</div>
+                  <div className="outline-sec-desc">{sec.description}</div>
+                  {sec.key_questions?.length > 0 && (
+                    <div className="outline-questions">
+                      <div className="outline-q-label">Key Questions to Answer:</div>
+                      {sec.key_questions.map((q, qIdx) => (
+                        <div key={qIdx} className="outline-q-item">• {q}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Progress stages */}
         {loading && (
           <div className="progress-card">
