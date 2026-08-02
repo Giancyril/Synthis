@@ -129,6 +129,8 @@ class ResearchReport(BaseModel):
     share_token: Optional[str] = None
     share_enabled: bool = False
     share_created_at: Optional[str] = None
+    # Multi-language (Output Feature 3)
+    output_language: str = "en"
 
 
 # ---------------------------------------------------------------------------
