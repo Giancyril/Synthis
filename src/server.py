@@ -406,6 +406,40 @@ def get_source_credibility(report_id: str, source_id: str):
 
 
 # ---------------------------------------------------------------------------
+# Keyword & Theme Extractor (Advanced Feature 5)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/reports/{report_id}/keywords", response_model=dict, tags=["Reports"])
+def get_report_keywords(report_id: str, top_n: int = 15, n_themes: int = 5):
+    """
+    Returns top keywords and theme clusters extracted from a saved report via TF-IDF-style analysis.
+    """
+    import json
+    from src.output.keyword_extractor import extract_keywords, cluster_themes
+
+    safe_id = Path(report_id).name
+    json_path = Path("output") / f"{safe_id}.json"
+    if not json_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Report '{safe_id}' not found.")
+
+    try:
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+        report = ResearchReport.model_validate(data)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Failed to load report: {exc}")
+
+    keywords = extract_keywords(report, top_n=top_n)
+    themes   = cluster_themes(keywords, n_themes=n_themes)
+    return {
+        "status": "success",
+        "keywords": [k.model_dump() for k in keywords],
+        "themes":   [t.model_dump() for t in themes],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Report diffing endpoint (Output Feature 2)
 # ---------------------------------------------------------------------------
 
