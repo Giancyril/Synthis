@@ -48,6 +48,45 @@ All active filters are echoed back in the UI as summary chips above the generate
 - **Annotations & Personal Notes**: Leave notes and comments on specific takeaways, sections, or sources. Features inline thread expansion, resolved/unresolved toggling, deletion, and unresolved badge counters (`💬 N open`). Notes stay strictly private to the report owner — never exposed on public shared links.
 - **Team Knowledge Base & Full-Text Search**: Search past research using a high-performance SQLite FTS5 index over topics, key takeaways, section content, and source titles. Results feature BM25 relevance ranking and contextually highlighted search term snippets (`<mark>`).
 
+### Output & Presentation Features
+
+#### Bibliography Export (APA 7th, MLA 9th, Chicago Author-Date)
+Export a properly formatted bibliography of all sources cited in a report at the click of a button.
+
+- **Three citation styles** — APA 7th edition, MLA 9th edition, and Chicago Author-Date — each formatted according to official style conventions.
+- **Graceful degradation** for missing metadata: `n.d.` (no date) when publication date is unavailable, URL hostname used as group author/publisher when no explicit author is identified — no invented placeholders.
+- **Alphabetically sorted** entries within each style.
+- **Copy to clipboard** with one click; full monospace text output for easy pasting into documents.
+- Accessed via the **"Citations"** button in the report header action bar — opens an inline panel with style chips (`APA 7th`, `MLA 9th`, `Chicago`) and a read-only formatted text area.
+- Backend endpoint: `GET /api/reports/{report_id}/bibliography?style=apa|mla|chicago`
+
+> **Style conventions implemented:**
+> - **APA 7**: `Org/Site Name. (Year, Month Day). *Title*. Site. URL`
+> - **MLA 9**: `"Title." *Site*, Date, URL.` (author element omitted per §5.4 when unavailable)
+> - **Chicago**: `Site/Org. "Title." Accessed Date. URL.`
+
+#### Report Diffing — What Changed Since Last Time?
+Compare any two reports on the same or similar topic to see exactly what has changed between research runs.
+
+- **Auto-detection of prior similar reports**: Every time a new report is generated, Synthis scans past saved reports using a Jaccard token similarity metric. If a previously saved report has ≥ 50% topic word overlap, a dismissible **"Similar Past Report Found"** hint banner appears with a **"View What Changed ↗"** button.
+- **Structured diff view** (Report Comparison & Diff modal):
+  - 🔴 **Potentially Contradicted / Shifted Findings** — takeaways in the new report that appear to contradict or update findings in the prior report (highlighted prominently in rose/red with a review note).
+  - ✦ **Newly Discovered Takeaways** — insights present in the new report that were absent before.
+  - 🌐 **Newly Discovered Web Sources** — sources retrieved in the new run that were not in the old run (normalized URL comparison).
+  - 💤 **Stale / Unretrieved Sources** — sources from the baseline run that did not appear in the new retrieval pass.
+  - **Topic Match %** — Jaccard similarity score displayed in the diff header.
+- Backend endpoint: `GET /api/reports/{report_id}/diff?against={other_report_id}`
+- All diffing is **deterministic and zero-latency** — no LLM call is made for diffing; contradiction detection uses token overlap + linguistic negation heuristics.
+
+#### Multi-Language Report Synthesis
+Generate the full research report prose in any of 9 supported languages with a single selector.
+
+- **Supported languages**: English (default), Spanish, French, German, Japanese, Chinese (Mandarin), Arabic, Portuguese, Hindi.
+- **Language selector** in the search bar footer — a `CustomSelectDropdown` next to the depth selector.
+- **Translation at synthesis only**: The language instruction is injected exclusively into the Gemini synthesis prompt (Stage 5). Per-source summarization (`summarizer.py`) is deliberately left untouched — summaries stay in the original source language. Translation is a single-pass concern, not a multi-step transform.
+- **Citation marker preservation**: `[S1]`, `[S2]`, source titles, and URLs are explicitly excluded from translation — they always remain in their original form.
+- **Persisted in report metadata**: `output_language` is stored in the JSON sidecar so the language of each report is always known.
+- **Report UI chip**: A `🌐 Spanish Prose` chip appears in the report metadata row whenever a non-English language was used.
 
 ### Advanced Features
 - **Research Depth Selector**: User-controlled execution modes tailored for different research needs:
@@ -80,6 +119,7 @@ Fully themed, accessible React components that match the Synthis dark design sys
 - **Google Gemini 2.5 Flash API** (`google-genai` SDK) for query planning, source summarization, and report synthesis
 - **Tavily Python SDK** (`tavily-python`) for web retrieval with native filter parameter passthrough
 - **Pydantic v2** for strict data modeling and schema validation — including `FilterSettings` with full cross-field validation
+- **SQLite FTS5** for full-text search over past reports (zero external search service required)
 - **Python-Dotenv** for environment variable management
 - **Pytest & Pytest-Asyncio** for comprehensive unit and integration testing
 
@@ -99,22 +139,28 @@ graph TD
     subgraph Client ["Frontend (React 19 / Vite)"]
         UI["Search UI & Topic Chips"]
         Depth["Depth Selector (Quick/Standard/Deep)"]
+        LangSel["Language Selector (9 languages)"]
         Filters["Filter Panel (Date / Domain / Scope)"]
         Tracker["Stage Progress Tracker"]
         ReportView["Report Viewer & Citation Popovers"]
+        BibPanel["Bibliography Export Panel"]
+        DiffModal["Report Diff Modal"]
         History["Past Reports Drawer"]
         Audio["Web Speech Audio Narrator"]
     end
 
     subgraph Server ["Backend (FastAPI / Uvicorn)"]
-        Endpoints["REST API (/api/research, /api/reports)"]
+        Endpoints["REST API (/api/research, /api/reports, /api/reports/diff, /api/reports/bibliography)"]
         FilterModel["FilterSettings (Pydantic)"]
         Planner["Query Planner"]
         RetrieverSvc["Retriever (Tavily Client + Native Filters)"]
         FilterSvc["Source Filter & Deduplicator"]
         SummarizerSvc["Grounded Source Summarizer"]
-        SynthesizerSvc["Report Synthesizer"]
+        SynthesizerSvc["Report Synthesizer (+ Language Instruction)"]
         MapperSvc["Citation Mapper & Verifier"]
+        DiffSvc["Report Diff Engine"]
+        BibSvc["Citation Formatter (APA/MLA/Chicago)"]
+        FTSIdx["SQLite FTS5 Index"]
     end
 
     subgraph External ["External AI & Web Services"]
@@ -124,6 +170,7 @@ graph TD
 
     UI --> Endpoints
     Depth --> Endpoints
+    LangSel --> Endpoints
     Filters --> Endpoints
     Endpoints --> FilterModel
     Endpoints --> Planner
@@ -137,7 +184,12 @@ graph TD
     Endpoints --> SynthesizerSvc
     SynthesizerSvc --> Gemini
     Endpoints --> MapperSvc
+    Endpoints --> DiffSvc
+    Endpoints --> BibSvc
+    Endpoints --> FTSIdx
     Endpoints --> ReportView
+    BibPanel --> Endpoints
+    DiffModal --> Endpoints
     ReportView --> Audio
     History --> Endpoints
 ```
@@ -169,7 +221,7 @@ graph LR
     end
 
     subgraph Stage5 ["Stage 5"]
-        Summaries --> Synthesizer[Gemini Synthesizer]
+        Summaries --> Synthesizer["Gemini Synthesizer\n(+ Language Instruction)"]
         Synthesizer --> DraftReport[Draft Takeaways & Sections]
     end
 
@@ -195,28 +247,37 @@ AI Research Assistant/
 │   ├── server.py               # FastAPI web server, REST endpoints & ResearchRequest schema
 │   ├── models/                 # Pydantic schemas
 │   │   ├── __init__.py
-│   │   └── schemas.py          # FilterSettings, Source, KeyTakeaway, ReportSection, ResearchReport
-│   │   ├── services/               # Service wrappers & session manager
-│   │   │   ├── __init__.py
-│   │   │   ├── gemini_client.py    # Gemini API wrapper with backoff retry
-│   │   │   ├── tavily_client.py    # Tavily API wrapper with native filter passthrough
-│   │   │   └── session_manager.py  # Multi-pass research session orchestrator & delta synthesis
-│   │   ├── pipeline/               # Research pipeline modules
-│   │   │   ├── __init__.py
-│   │   │   ├── query_planner.py    # Stage 1: Topic -> Search Queries (depth-aware)
-│   │   │   ├── retriever.py        # Stage 2: Queries -> Web Sources (+ FilterSettings)
-│   │   │   ├── source_filter.py    # Stage 3: Deduplication & Filtering
-│   │   │   ├── summarizer.py       # Stage 4: Grounded Source Summarization
-│   │   │   ├── synthesizer.py      # Stage 5: Executive Synthesis
-│   │   │   ├── citation_mapper.py  # Stage 6: Grounding & Citation Audit
-│   │   │   ├── followup_pipeline.py# Scoped mini-pipeline for drill-downs
-│   │   │   └── comparative_pipeline.py # 5-stage dimensional comparative pipeline
-│   │   └── output/                 # Exporters
-│   │       ├── __init__.py
-│   │       ├── markdown_export.py  # Markdown generator
-│   │       └── json_export.py      # JSON exporter
-├── tests/                      # Automated test suite (29 tests)
+│   │   └── schemas.py          # FilterSettings, Source, KeyTakeaway, ReportSection, ResearchReport, ReportDiff
+│   ├── services/               # Service wrappers & session manager
+│   │   ├── __init__.py
+│   │   ├── gemini_client.py    # Gemini API wrapper with backoff retry
+│   │   ├── tavily_client.py    # Tavily API wrapper with native filter passthrough
+│   │   └── session_manager.py  # Multi-pass research session orchestrator & delta synthesis
+│   ├── pipeline/               # Research pipeline modules
+│   │   ├── __init__.py
+│   │   ├── query_planner.py    # Stage 1: Topic -> Search Queries (depth-aware)
+│   │   ├── retriever.py        # Stage 2: Queries -> Web Sources (+ FilterSettings)
+│   │   ├── source_filter.py    # Stage 3: Deduplication & Filtering
+│   │   ├── summarizer.py       # Stage 4: Grounded Source Summarization (language-neutral)
+│   │   ├── synthesizer.py      # Stage 5: Executive Synthesis (+ output_language instruction)
+│   │   ├── citation_mapper.py  # Stage 6: Grounding & Citation Audit
+│   │   ├── followup_pipeline.py# Scoped mini-pipeline for drill-downs
+│   │   └── comparative_pipeline.py # 5-stage dimensional comparative pipeline
+│   ├── output/                 # Exporters & post-processors
+│   │   ├── __init__.py
+│   │   ├── markdown_export.py  # Markdown generator
+│   │   ├── json_export.py      # JSON exporter
+│   │   ├── citation_formatter.py # APA 7th / MLA 9th / Chicago bibliography formatter
+│   │   └── report_diff.py      # Jaccard similarity, URL normalization, ReportDiff computation
+│   └── routes/                 # FastAPI route modules
+│       ├── sharing_routes.py   # Shareable link generation & public report view
+│       ├── annotation_routes.py# Personal notes & annotation CRUD
+│       └── search_routes.py    # SQLite FTS5 full-text search
+├── tests/                      # Automated test suite (87 tests)
 │   ├── __init__.py
+│   ├── test_citation_formatter.py   # 33 tests — APA/MLA/Chicago formatting & edge cases
+│   ├── test_report_diff.py          # 6 tests — diff engine, URL normalization & similarity
+│   ├── test_synthesizer_language.py # 2 tests — multi-language prompt injection
 │   ├── test_citation_mapper.py
 │   ├── test_comparative.py     # Comparative pipeline & citation verification tests
 │   ├── test_exports.py
@@ -225,6 +286,9 @@ AI Research Assistant/
 │   ├── test_query_planner.py
 │   ├── test_retriever.py
 │   ├── test_sessions.py        # Multi-pass session deduplication & delta synthesis tests
+│   ├── test_sharing.py         # Share link generation & public route tests
+│   ├── test_annotations.py     # Annotation CRUD tests
+│   ├── test_search.py          # FTS5 search ranking & relevance tests
 │   ├── test_source_filter.py
 │   ├── test_summarizer.py
 │   └── test_synthesizer.py
@@ -237,21 +301,31 @@ AI Research Assistant/
 │       ├── App.jsx             # Main research interface & state machine
 │       ├── api.js              # Fetch client for FastAPI backend
 │       ├── components.jsx      # CustomSelectDropdown & CustomDatePicker components
-│       └── index.css           # Full CSS design system (csd-*, cdp-*, filter-*, etc.)
-└── output/                     # Directory storing generated markdown reports
+│       └── index.css           # Full CSS design system (filter-*, bibliography-*, diff-*, etc.)
+└── output/                     # Generated markdown reports & JSON metadata sidecars
 ```
 
 ## API Documentation Overview
 
-The FastAPI backend exposes the following REST endpoints:
-
-* **GET `/api/health`**: Returns system health status, Gemini model configuration, and Tavily key validation.
-* **POST `/api/research`**: Accepts the full `ResearchRequest` payload and executes the 6-stage pipeline, saving the `.md` report to `output/`.
-* **POST `/api/research/follow-up`**: Executes a scoped mini-pipeline answering a drill-down question on a specific takeaway or report section.
-* **POST `/api/research/compare`**: Executes a 5-stage comparative analysis for `topic_a` vs `topic_b` across inferred comparison dimensions.
-* **POST `/api/research/continue`**: Continues an existing report or session with a new research pass, returning a `ResearchSession` with delta summary.
-* **GET `/api/reports`**: Returns a list of all saved reports in `output/` sorted by modification date.
-* **GET `/api/reports/{filename}`**: Fetches the raw markdown content of a specific saved report.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/health` | System health status, model configuration, and API key validation |
+| `POST` | `/api/research` | Execute the full 6-stage pipeline; returns report + `possible_duplicate` hint when a similar past report is detected |
+| `POST` | `/api/research/follow-up` | Scoped mini-pipeline answering a drill-down question on a specific takeaway or section |
+| `POST` | `/api/research/compare` | 5-stage comparative analysis for `topic_a` vs `topic_b` across inferred dimensions |
+| `POST` | `/api/research/continue` | Continue an existing report with a new research pass; returns `ResearchSession` with delta summary |
+| `GET` | `/api/reports` | List all saved reports sorted by modification date |
+| `GET` | `/api/reports/{filename}` | Fetch raw markdown of a specific report |
+| `GET` | `/api/reports/{report_id}/bibliography` | Generate bibliography (`?style=apa\|mla\|chicago`) |
+| `GET` | `/api/reports/{report_id}/diff` | Compute structured diff between two reports (`?against={other_report_id}`) |
+| `POST` | `/api/reports/{report_id}/share` | Generate a public unlisted share link |
+| `DELETE` | `/api/reports/{report_id}/share` | Revoke a previously shared link |
+| `GET` | `/shared/{token}` | Public read-only report view (excludes annotations and session history) |
+| `GET` | `/api/reports/{report_id}/annotations` | List all annotations for a report |
+| `POST` | `/api/reports/{report_id}/annotations` | Create a new annotation |
+| `PATCH` | `/api/reports/{report_id}/annotations/{annotation_id}` | Update an annotation (body or resolved state) |
+| `DELETE` | `/api/reports/{report_id}/annotations/{annotation_id}` | Delete an annotation |
+| `GET` | `/api/search` | Full-text search across past reports (`?q=query`) |
 
 ## Performance Benchmarks
 
@@ -263,7 +337,11 @@ The FastAPI backend exposes the following REST endpoints:
 - **Citation Audit & Staleness Warning**: < 10ms for citation verification, corroboration mapping, and date recency calculation
 - **Follow-Up Scoped Mini-Pipeline**: ~1.5s (runs 1 query, summarizes only new sources)
 - **Comparative Research Pipeline**: ~4.2s (infers dimensions, runs dual retrieval passes per dimension)
-- **Test Coverage**: 29 unit & integration tests (28 offline passed, 1 live integration skipped by default)
+- **Bibliography Export**: < 1ms (pure string formatting, no LLM call)
+- **Report Diffing**: < 5ms (deterministic Jaccard similarity + heuristic negation scan, no LLM call)
+- **Duplicate Detection on Save**: < 10ms (scans all JSON sidecars in `output/`)
+- **FTS5 Full-Text Search**: < 20ms for BM25-ranked search over all indexed reports
+- **Test Coverage**: 87 unit & integration tests (86 offline passed, 1 live integration skipped by default)
 
 ## Features in Detail
 
@@ -296,12 +374,35 @@ The synthesizer consumes the clean array of per-source summaries and generates:
 - **Key Takeaways**: High-impact bullet points with explicit source ID mappings.
 - **Report Sections**: Themed narrative sections covering different aspects of the topic, containing inline `[S1]`, `[S2]` citation tags.
 - **Confidence Note**: Evaluates whether the retrieved sources provide sufficient coverage or if additional investigation is recommended.
+- **Language Instruction**: When `output_language != "en"`, the synthesis prompt includes a critical instruction to produce all prose in the target language while preserving citation markers and source metadata verbatim.
 
 ### Citation Mapping & Verification Engine
 Stage 6 programmatically inspects every section returned by the LLM:
 - Validates that every citation tag (e.g. `[S3]`) corresponds to an actual source in the retained sources list.
 - Strips hallucinated citation tags that reference non-existent source IDs.
 - Flags sections that lack citations so the user is informed of ungrounded statements.
+
+### Bibliography Formatter (`citation_formatter.py`)
+Three separate pure-Python formatter functions — `format_apa()`, `format_mla()`, `format_chicago()` — operate on `Source` Pydantic objects. Each function:
+- Reads `title`, `url`, `published_date`, and `snippet` (the only available fields).
+- Infers publisher/site name from the URL hostname using `urllib.parse` (strips `www.` prefix and path components).
+- Degrades gracefully: `n.d.` for missing dates; hostname-as-author when no author is identified.
+- `format_bibliography()` sorts all entries alphabetically and joins them with double newlines, preceded by a style header line.
+
+### Report Diff Engine (`report_diff.py`)
+Three composable functions power the diffing feature:
+- **`normalize_url(url)`**: Strips scheme, `www.`, trailing slashes, and query parameters for URL comparison.
+- **`topic_similarity(a, b)`**: Computes Jaccard overlap of 3+ character word tokens between two topic strings, filtering common stop words. Returns float 0.0–1.0.
+- **`compute_diff(old_report, new_report)`**: Classifies every source and takeaway into buckets. Contradiction detection requires (1) ≥ 2 overlapping non-trivial words with an old takeaway AND (2) presence of negation/delay words (`not`, `failed`, `delayed`, `never`, `dropped`, `unlikely`, etc.). No LLM call — entirely deterministic and instant.
+
+### Multi-Language Synthesis
+The language instruction is a single string appended to the Gemini synthesis prompt in `synthesizer.py`. It explicitly names the target language (resolved from ISO 639-1 code via a lookup table) and calls out the citation marker exemption:
+```
+CRITICAL LANGUAGE INSTRUCTION:
+Synthesize and write all output prose ... in Spanish.
+Do NOT translate or alter citation markers (e.g. [S1], [S2]), source titles, or URLs — keep those strictly in their original form.
+```
+`summarizer.py` is deliberately untouched — each source is still summarized in its original language, which preserves source fidelity. Translation is performed exactly once, at the synthesis stage.
 
 ### Interactive Citation Popovers
 The React frontend parses rendered text for `[S#]` tags and wraps them in interactive elements. Hovering over a tag triggers a floating popover showing the source title, domain name, snippet text, and link, allowing instant verification without leaving the report view.
@@ -312,8 +413,7 @@ The React frontend parses rendered text for `[S#]` tags and wraps them in intera
 - Full keyboard navigation: `↑` / `↓` to move focus, `Enter` / `Space` to select, `Escape` to dismiss
 - Per-option description sub-text (used on the Domain Filter to explain each mode)
 - Checkmark indicator on the active selection
-- Smooth scale + fade open animation
-- Closes on outside click
+- Smooth scale + fade open animation; closes on outside click
 
 **`CustomDatePicker`** — A fully custom React-rendered calendar with no native `<input type="date">`:
 - Styled trigger button showing a formatted human-readable date (`Jul 31, 2026`)
@@ -322,7 +422,7 @@ The React frontend parses rendered text for `[S#]` tags and wraps them in intera
 - Today highlighted in brand purple; selected day filled solid with glow
 - Days outside `min` / `max` range are greyed-out and non-interactive
 - **Clear** button resets the value; **Today** jumps to the current date
-- Smooth scale + fade open animation, closes on outside click
+- Smooth scale + fade open animation; closes on outside click
 
 ### Web Speech Summary Narrator
 Using the native browser `window.speechSynthesis` API, the user can click **"Listen Summary"** to hear an audio narration of all key takeaways. The interface updates dynamically with play and stop controls.
