@@ -38,6 +38,7 @@ def run_research_pipeline(
     depth: str = "standard",
     filter_settings: Optional[FilterSettings] = None,
     config: Config = None,
+    output_language: str = "en",
 ) -> ResearchReport:
     """
     Executes the complete grounded AI research pipeline:
@@ -58,44 +59,43 @@ def run_research_pipeline(
     settings = depth_settings.get(depth.lower(), depth_settings["standard"])
 
     print(f"\n=======================================================")
-    print(f"🚀 AI Research Assistant — Grounded Pipeline")
-    print(f"Topic: '{topic}' | Depth: {depth.upper()} ({settings['max_queries']} queries, max {settings['max_sources']} sources)")
-    print(f"=======================================================\n")
+    print(f"🚀 Starting Research Pipeline for topic: '{topic}' [{depth} mode, lang: {output_language}]")
+    print(f"=======================================================")
 
     # Initialize services
     gemini_svc = GeminiService(api_key=config.gemini_api_key, model_name=config.gemini_model)
     tavily_svc = TavilyService(api_key=config.tavily_api_key)
 
     # Step 1: Query Planning
-    print(" [1/6] Planning search queries with Gemini...")
+    print("\n [1/6] Planning web search queries with Gemini...")
     planner = QueryPlanner(gemini_svc)
     queries = planner.plan_queries(topic, max_queries=settings["max_queries"])
-    print(f"   └─ Planned {len(queries)} search queries:")
-    for q in queries:
-        print(f"      • {q}")
+    print(f"   └─ Generated {len(queries)} search queries: {queries}")
 
     # Step 2: Retrieval
     print("\n [2/6] Retrieving web sources via Tavily API...")
     retriever = Retriever(tavily_svc)
     raw_sources = retriever.retrieve_sources(queries, filter_settings=filter_settings)
-    print(f"   └─ Retrieved {len(raw_sources)} raw search results.")
+    print(f"   └─ Retrieved {len(raw_sources)} raw web sources.")
 
     # Step 3: Filtering & Deduplication
-    print("\n [3/6] Deduplicating and filtering high-relevance sources...")
+    print("\n [3/6] Deduplicating, filtering, and scoring credibility...")
     source_filter = SourceFilter(min_score=0.2, max_sources=settings["max_sources"])
     clean_sources = source_filter.filter_sources(raw_sources)
-    print(f"   └─ Retained {len(clean_sources)} clean sources.")
+    print(f"   └─ Retained {len(clean_sources)} clean sources after filtering.")
 
-    # Step 4: Per-Source Summarization
+    # Step 4: Summarization (Per-source summarization is untouched)
     print("\n [4/6] Summarizing each source grounded strictly in text...")
     summarizer = SourceSummarizer(gemini_svc)
     summarized_sources = summarizer.summarize_sources(clean_sources)
     print(f"   └─ Completed summaries for {len(summarized_sources)} sources.")
 
-    # Step 5: Synthesis
+    # Step 5: Synthesis (Translation applied at synthesis level if requested)
     print("\n [5/6] Synthesizing report sections, key takeaways, and conflict analysis...")
     synthesizer = ReportSynthesizer(gemini_svc)
-    takeaways, raw_sections, conflicts, conf_note = synthesizer.synthesize_report(topic, summarized_sources)
+    takeaways, raw_sections, conflicts, conf_note = synthesizer.synthesize_report(
+        topic, summarized_sources, output_language=output_language
+    )
     print(f"   └─ Generated {len(takeaways)} key takeaways, {len(raw_sections)} report sections, and {len(conflicts)} conflicting topic groups.")
 
     # Step 6: Citation Mapping & Grounding Validation
@@ -122,6 +122,7 @@ def run_research_pipeline(
         conflicting_information=conflicts,
         confidence_note=final_conf_note,
         filter_settings=filter_settings,
+        output_language=output_language,
     )
 
     # Export report to disk

@@ -31,7 +31,7 @@ class ReportSynthesizer:
         self.gemini_service = gemini_service
 
     def synthesize_report(
-        self, topic: str, sources: List[Source]
+        self, topic: str, sources: List[Source], output_language: str = "en"
     ) -> Tuple[List[KeyTakeaway], List[ReportSection], List[ConflictingTopic], Optional[str]]:
         """
         Synthesizes per-source summaries into key takeaways, report sections, and structured conflicting_information.
@@ -48,6 +48,25 @@ class ReportSynthesizer:
                 f"[{s.id}] Title: {s.title}\nURL: {s.url}\nSummary: {summary_text}"
             )
         formatted_sources = "\n\n".join(source_payloads)
+
+        lang_instructions = ""
+        if output_language and output_language.lower() != "en":
+            lang_names = {
+                "es": "Spanish",
+                "fr": "French",
+                "de": "German",
+                "ja": "Japanese",
+                "zh": "Chinese (Mandarin)",
+                "ar": "Arabic",
+                "pt": "Portuguese",
+                "hi": "Hindi",
+            }
+            target_lang = lang_names.get(output_language.lower(), output_language)
+            lang_instructions = (
+                f"\n\nCRITICAL LANGUAGE INSTRUCTION:\n"
+                f"Synthesize and write all output prose (takeaway texts, section headings, section content prose, confidence note) in {target_lang}.\n"
+                f"Do NOT translate or alter citation markers (e.g. [S1], [S2]), source titles, or URLs — keep citation markers, titles, and URLs strictly in their original form."
+            )
 
         prompt = (
             f"Topic: {topic}\n\n"
@@ -74,6 +93,7 @@ class ReportSynthesizer:
             '  ],\n'
             '  "confidence_note": null\n'
             "}"
+            f"{lang_instructions}"
         )
 
         try:
