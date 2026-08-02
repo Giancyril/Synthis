@@ -201,6 +201,38 @@ def execute_research(req: ResearchRequest):
         )
 
 
+@app.post("/api/research/outline", response_model=dict, tags=["Research"])
+def generate_research_outline(req: ResearchRequest):
+    if not req.topic or not req.topic.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Research topic cannot be empty.",
+        )
+
+    try:
+        cfg = Config(check_keys=True)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        )
+
+    try:
+        from src.services.gemini_client import GeminiService
+        from src.pipeline.outline_generator import OutlineGenerator
+
+        gemini_svc = GeminiService(api_key=cfg.gemini_api_key, model_name=cfg.gemini_model)
+        generator = OutlineGenerator(gemini_svc)
+        outline = generator.generate_outline(req.topic.strip(), depth=req.depth or "standard")
+        return {"status": "success", "outline": outline.model_dump()}
+    except Exception as exc:
+        logger.error(f"Error generating outline: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate outline: {str(exc)}",
+        )
+
+
 @app.get("/api/reports", response_model=List[ReportSummary], tags=["Reports"])
 def list_reports():
     import json as _json
