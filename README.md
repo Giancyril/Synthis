@@ -70,10 +70,10 @@ Compare any two reports on the same or similar topic to see exactly what has cha
 
 - **Auto-detection of prior similar reports**: Every time a new report is generated, Synthis scans past saved reports using a Jaccard token similarity metric. If a previously saved report has ≥ 50% topic word overlap, a dismissible **"Similar Past Report Found"** hint banner appears with a **"View What Changed ↗"** button.
 - **Structured diff view** (Report Comparison & Diff modal):
-  - 🔴 **Potentially Contradicted / Shifted Findings** — takeaways in the new report that appear to contradict or update findings in the prior report (highlighted prominently in rose/red with a review note).
-  - ✦ **Newly Discovered Takeaways** — insights present in the new report that were absent before.
-  - 🌐 **Newly Discovered Web Sources** — sources retrieved in the new run that were not in the old run (normalized URL comparison).
-  - 💤 **Stale / Unretrieved Sources** — sources from the baseline run that did not appear in the new retrieval pass.
+  - **Potentially Contradicted / Shifted Findings** — takeaways in the new report that appear to contradict or update findings in the prior report (highlighted prominently in rose/red with a review note).
+  - **Newly Discovered Takeaways** — insights present in the new report that were absent before.
+  - **Newly Discovered Web Sources** — sources retrieved in the new run that were not in the old run (normalized URL comparison).
+  - **Stale / Unretrieved Sources** — sources from the baseline run that did not appear in the new retrieval pass.
   - **Topic Match %** — Jaccard similarity score displayed in the diff header.
 - Backend endpoint: `GET /api/reports/{report_id}/diff?against={other_report_id}`
 - All diffing is **deterministic and zero-latency** — no LLM call is made for diffing; contradiction detection uses token overlap + linguistic negation heuristics.
